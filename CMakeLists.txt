@@ -9,21 +9,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # program name
 project(HelloGL C CXX)
 
-if(WIN32)
- set(CMAKE_TOOLCHAIN_FILE "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
-   CACHE STRING "Vcpkg toolchain file")
- message(STATUS "use vcpkg")
-endif(WIN32)
+# Use ide configuration instead
+# if(WIN32)
+#  set(CMAKE_TOOLCHAIN_FILE "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+#    CACHE STRING "Vcpkg toolchain file")
+#  message(STATUS "use vcpkg")
+# endif(WIN32)
 
 # message(STATUS ${CMAKE_PREFIX_PATH})
 
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -g")
-
+if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -g")
+endif()
 
 # create compile file
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 
 # add package
 # find_package(OpenCL REQUIRED)
@@ -37,7 +37,6 @@ option(OPENMP_ENABLE "Use OpenMP" ON)
 if(USE_GCC)
 
 else()
-
   if(OPENMP_ENABLE)
     find_package(OpenMP REQUIRED)
 
@@ -47,7 +46,6 @@ else()
       message(STATUS "-> OpenMP included at ${OpenMP_CXX_INCLUDE_DIRS} ${OpenMP_C_INCLUDE_DIRS}")
     endif(OpenMP_FOUND)
   endif(OPENMP_ENABLE)
-
 endif(USE_GCC)
 
 
@@ -61,13 +59,14 @@ link_directories(${PROJECT_SOURCE_DIR}/lib)
 find_package(GLM REQUIRED)
 message(STATUS "-> GLM included at ${GLM_INCLUDE_DIR}")
 if(WIN32)
- find_package(glfw3 CONFIG REQUIRED)
- find_package(assimp CONFIG REQUIRED)
- find_package(Freetype REQUIRED)
+  find_package(glfw3 CONFIG REQUIRED)
+  find_package(assimp CONFIG REQUIRED)
+  find_package(Freetype REQUIRED)
 else()
- find_package(GLFW3 REQUIRED)
- find_package(ASSIMP REQUIRED)
+  find_package(GLFW3 REQUIRED)
+  find_package(ASSIMP REQUIRED)
 endif(WIN32)
+
 message(STATUS "-> GLFW3 included at ${GLFW3_INCLUDE_DIR}")
 #find_package(ASSIMP REQUIRED)
 #message(STATUS "-> ASSIMP included at ${ASSIMP_INCLUDE_DIR}")
@@ -81,7 +80,7 @@ if(POLICY CMP0072)
 endif()
 
 if(WIN32)
- find_package(Freetype REQUIRED)
+  find_package(Freetype REQUIRED)
   set(LIBS glfw opengl32 Freetype::Freetype assimp::assimp)
 elseif(UNIX AND NOT APPLE)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
@@ -110,8 +109,18 @@ else()
 endif(WIN32)
 
 message(STATUS "-> [Fin] Gernate LIBS")
-configure_file(configuration/root_directory.h.in configuration/root_directory.h)
-include_directories(${CMAKE_BINARY_DIR}/configuration)
+
+# configure_file(configuration/root_directory.h.in configuration/root_directory.h)
+# include_directories(${CMAKE_BINARY_DIR}/configuration)
+
+# Use my own configuration instead
+# Setting up the source directory for executable
+set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/)
+
+configure_file(${CMAKE_SOURCE_DIR}/configuration/config.h.in ${CMAKE_BINARY_DIR}/config.h)
+
+include_directories(${CMAKE_BINARY_DIR})
+
 message(STATUS "-> [Fin] Gernate configuration")
 
 

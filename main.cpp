@@ -3,6 +3,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include "config.h"
+
 int main() {
   // init gui and imgui
   dym::GUI gui(SCR_WIDTH, SCR_HEIGHT, framebuffer_size_callback, mouse_callback,
@@ -23,18 +25,18 @@ int main() {
   // build and compile shaders
   // -------------------------------
   // load models' shader
-  dym::rdt::Shader modelShader("./shaders/model_render.vs",
-                               "./shaders/model_render.fs");
+  dym::rdt::Shader modelShader(SOURCE_DIR "/shaders/model_render.vs",
+                               SOURCE_DIR "/shaders/model_render.fs");
   // load luminous objects' shader
-  dym::rdt::Shader lightShader("./shaders/lightbox.vs",
-                               "./shaders/lightbox.fs");
+  dym::rdt::Shader lightShader(SOURCE_DIR  "/shaders/lightbox.vs",
+                               SOURCE_DIR  "/shaders/lightbox.fs");
   // load sky box shader
-  dym::rdt::Shader skyboxShader("./shaders/skybox.vs", "./shaders/skybox.fs");
+  dym::rdt::Shader skyboxShader(SOURCE_DIR  "/shaders/skybox.vs", SOURCE_DIR  "/shaders/skybox.fs");
 
   // load models
   // -----------
   // // 1. backpack
-  // dym::rdt::Model ourModel("./resources/objects/backpack/backpack.obj");
+  // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/backpack/backpack.obj");
   // modelShader.setTexture("texture_height1", 0);
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) { return; };
   // glm::vec3 modelScaler(1.);
@@ -42,7 +44,7 @@ int main() {
   // glm::quat initRotate(1, glm::vec3(0, 0, 0));
 
   // // 2. nanosuit
-  // dym::rdt::Model ourModel("./resources/objects/nanosuit/nanosuit.obj");
+  // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/nanosuit/nanosuit.obj");
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) { return; };
   // glm::vec3 modelScaler(1.);
   // glm::vec3 initTranslater(0, -10, 0);
@@ -50,15 +52,15 @@ int main() {
 
   // 3. cerberus gun
   dym::rdt::Model ourModel(
-      "./resources/objects/Cerberus_by_Andrew_Maximov/Cerberus_LP.FBX");
+      SOURCE_DIR "/resources/objects/Cerberus_by_Andrew_Maximov/Cerberus_LP.FBX");
   // load other textures
   dym::rdt::Texture normalTex(
-      "./resources/objects/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga",
+      SOURCE_DIR "/resources/objects/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga",
       dym::rdt::TexType.normal);
   dym::rdt::Texture specularTex(
-      "./resources/objects/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga",
+      SOURCE_DIR "/resources/objects/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga",
       dym::rdt::TexType.specular);
-  dym::rdt::Texture reflectTex("./resources/objects/Cerberus_by_Andrew_Maximov/"
+  dym::rdt::Texture reflectTex(SOURCE_DIR "/resources/objects/Cerberus_by_Andrew_Maximov/"
                                "Textures/Cerberus_R.tga",
                                dym::rdt::TexType.height);
   auto bindOtherTexture = [&](dym::rdt::Shader &s) {
@@ -91,7 +93,7 @@ int main() {
   std::vector<std::string> faces{"right.jpg",  "left.jpg",  "top.jpg",
                                  "bottom.jpg", "front.jpg", "back.jpg"};
   for (auto &face : faces)
-    face = "./resources/textures/skybox/" + face;
+    face = SOURCE_DIR "/resources/textures/skybox/" + face;
   // load skyBox
   dym::rdo::SkyBox skybox;
   skybox.loadCubeTexture(faces);
