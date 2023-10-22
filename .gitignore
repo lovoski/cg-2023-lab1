@@ -1,0 +1,11 @@
+/resources
+
+/build
+/Debug
+/Release
+
+/.vscode
+
+*.exe
+*.dll
+*.pdb
