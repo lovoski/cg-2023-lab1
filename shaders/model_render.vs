@@ -28,6 +28,7 @@ void main()
   
   // TODO: transform position
   gl_Position=vec4(aPos,1.);
+  gl_Position=projection*view*model*gl_Position;
   
   // TODO: calculate TBN matrix
   

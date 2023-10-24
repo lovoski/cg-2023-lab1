@@ -114,14 +114,25 @@ int main() {
   int i = 0;
 
   camera.Position = {0, 0, 20};
-  camera.MouseSensitivity = 0.01;
+  camera.MouseSensitivity = 0.1;
 
   // set lightCube position and rotate
   // ---------------------------------------
   lmat.position = {10, 0, 0};
   glm::quat lightR(glm::radians(glm::vec3(0, 2, 0)));
   // NOTE: you can use qprint to check quaterion's value
-  qprint(lightR.w, lightR.x, lightR.y, lightR.z);
+  // qprint(lightR.w, lightR.x, lightR.y, lightR.z);
+
+  // properties of the camera
+  const float zNear = 0.1f;
+  const float zFar = 100.0f;
+  const float aspect = 1.0f;
+  const float fovy = glm::radians(45.0f);
+
+  // the interval for each rotation of the light source
+  // unit in seconds
+  const double rotation_interval = 0.05;
+  double rotation_timer = 0;
 
   // render loop
   // -----------
@@ -144,14 +155,20 @@ int main() {
     // render
     // ------
     // TODO: use gl api to clear framebuffer and depthbuffer
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     // TODO: light position rotate
     // use quat lightR to rotate lightbox
-    lmat.position = lmat.position;
+    if (currentFrame-rotation_timer >= rotation_interval) {
+      lmat.position = lightR*lmat.position;
+      rotation_timer = currentFrame;
+    } else {
+      lmat.position = lmat.position;
+    }
 
     // TODO: create projection matrix
     // use glm to create projection and view matrix
-    glm::mat4 projection;
+    glm::mat4 projection = glm::perspective(fovy, aspect, zNear, zFar);
     glm::mat4 view = camera.GetViewMatrix();
 
     // load projection and view into shaders' uniformBuffer
@@ -162,11 +179,11 @@ int main() {
 
     // TODO: calculate model transform matrix
     // rotate: convert initRotate to glm::mat4
-    glm::mat4 R;
+    glm::mat4 R = glm::mat4_cast(initRotate);
     // translate: convert initTranslater to glm::mat4
-    glm::mat4 T;
+    glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
     // scale: convert modelScaler to glm::mat4
-    glm::mat4 S;
+    glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
 
     // load all value we need into shader
@@ -174,7 +191,7 @@ int main() {
       s.use();
       // TODO: calculate the model transformation matrix
       // S*T*R? R*S*T? etc. Think about it and then fill in your answer.
-      s.setMat4("model", glm::mat4(1.f));
+      s.setMat4("model", glm::mat4(1.f)*R*S*T);
       s.setVec3("viewPos", camera.Position);
       s.setMaterial("material", mat);
       s.setLightMaterial("light", lmat);
