@@ -11,7 +11,7 @@ int main() {
                scroll_callback);
   UseImGui myimgui;
   myimgui.Init(gui.window, "#version 460 core");
-  float gamma = 1.2;
+  float gamma = 1.2f;
 
   // tell stb_image.h to flip loaded texture's on the y-axis (before loading
   // model).
@@ -69,7 +69,7 @@ int main() {
     s.setTexture("texture_height1", reflectTex.id);
   };
   setReflect = true;
-  glm::vec3 modelScaler(0.05);
+  glm::vec3 modelScaler(0.05f);
   glm::vec3 initTranslater(0);
   glm::quat initRotate = glm::quat(glm::radians(glm::vec3(0, 90, 0))) *
                          glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
@@ -83,9 +83,9 @@ int main() {
   dym::rdt::Material mat({1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {0.5, 0.5, 0.5},
                          32.);
 
-  glm::vec3 F0(0.04);
+  glm::vec3 F0(0.04f);
   dym::rdt::PoLightMaterial lmat({1.0, 1.0, 1.0}, {1.0, 1.0, 1.0},
-                                 {1.0, 1.0, 1.0}, 1.0, 0.045, 0.0075);
+                                 {1.0, 1.0, 1.0}, 1.0, 0.045f, 0.0075f);
 
   // load skyBox
   // -----------------
@@ -114,7 +114,7 @@ int main() {
   int i = 0;
 
   camera.Position = {0, 0, 20};
-  camera.MouseSensitivity = 0.1;
+  camera.MouseSensitivity = 0.1f;
 
   // set lightCube position and rotate
   // ---------------------------------------
@@ -162,8 +162,6 @@ int main() {
     if (currentFrame-rotation_timer >= rotation_interval) {
       lmat.position = lightR*lmat.position;
       rotation_timer = currentFrame;
-    } else {
-      lmat.position = lmat.position;
     }
 
     // TODO: create projection matrix

@@ -89,7 +89,8 @@ public:
     yoffset *= MouseSensitivity;
 
     Yaw += xoffset;
-    Pitch += yoffset;
+    // fix wield operation on y axis
+    Pitch -= yoffset;
 
     // make sure that when pitch is out of bounds, screen doesn't get flipped
     if (constrainPitch) {
