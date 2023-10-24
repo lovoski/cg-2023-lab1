@@ -115,7 +115,7 @@ message(STATUS "-> [Fin] Gernate LIBS")
 
 # Use my own configuration instead
 # Setting up the source directory for executable
-set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/)
+set(SOURCE_DIR ${CMAKE_SOURCE_DIR})
 
 configure_file(${CMAKE_SOURCE_DIR}/configuration/config.h.in ${CMAKE_BINARY_DIR}/config.h)
 
