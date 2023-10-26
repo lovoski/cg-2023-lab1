@@ -25,12 +25,15 @@ void main()
   TexCoords=aTexCoords;
   // Normal=aNormal;
   FragPos=vec3(model*vec4(aPos,1.));
-  
+
   // TODO: transform position
   gl_Position=vec4(aPos,1.);
   gl_Position=projection*view*model*gl_Position;
-  
+
+  // transform the normal vector with the vertices
+  vec3 normal = mat3(transpose(inverse(model)))*aNormal;
+
   // TODO: calculate TBN matrix
-  
-  TBN=mat3(1.);
+  // Output TBN to fragment shader
+  TBN=mat3(tangent, bitangent, normal);
 }

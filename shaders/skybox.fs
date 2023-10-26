@@ -4,9 +4,12 @@ out vec4 FragColor;
 in vec3 TexCoords;
 
 uniform samplerCube skybox;
+uniform int skyboxOn;
 
 void main()
 {
-  FragColor=texture(skybox,TexCoords);
+  if (skyboxOn == 1) {
+    FragColor=texture(skybox,TexCoords);
+  }
   // FragColor=vec4(1.,1.,1.,1.);
 }

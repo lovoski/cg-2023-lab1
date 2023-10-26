@@ -67,38 +67,50 @@ void main()
   if(existHeigTex){
     objheig=vec3(texture(texture_height1,TexCoords));
   }
-  
+
   vec3 objH=max(objheig,.05);
-  
+
   vec3 norm=normalize(TBN*normalize(objNorm*2.-1.));
   vec3 lightPos=light.position;
-  
+
   vec3 ambient=light.ambient*material.ambient;
-  
+
   // TODO: view direction: lightDir, viewDir and halfwayDir
-  
+  vec3 viewDir = normalize(viewPos-FragPos);
+  vec3 lightDir = normalize(lightPos-FragPos);
+  // replace v*r with h*n
+  vec3 halfwayDir = normalize(lightDir+viewDir);
+
   // TODO: scatter term
   vec3 diffuse;
-  
+  diffuse = light.diffuse*material.diffuse*(max(dot(lightDir, norm), 0.));
+
   // TODO: specular reflect term
   vec3 specular;
-  
+  // use the spec parameter from spec map
+  specular = light.specular*material.specular*objSpec*pow(max(dot(halfwayDir, norm), 0.), material.shininess);
+
   // TODO: attenuation
-  float attenuation;
-  
+  float dist = length(light.position - FragPos);
+  float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * (dist * dist));
+
   // TODO: SkyBox reflect term
   // NOTE: you should add fresnel reflection here!
   // vec3 F0=vec3(.04);
   vec3 F0_=mix(F0,objColor,objSpec);
-  vec3 F;
+  // the reflect function viewDirection is oppsite to blinn-phong model
+  vec3 reflectDir = reflect(-viewDir, norm);
+  vec3 F = vec3(0.);
   vec3 sky;
-  sky=(objH.r+F*.3)*sky;
-  
+  sky = skylightIntensity*(texture(skybox, reflectDir).rgb);
+  // sky = (objH.r+F*.3)*sky;
+
   vec3 result=(ambient+diffuse+specular)*objColor*(attenuation+sky);
-  // result=sky;
-  
+  // vec3 result=sky;
+  // vec3 result = F;
+
   FragColor=vec4(result,1.);
-  
+
   // TODO: do gamma correction here
   // gamma
   FragColor.rgb=pow(FragColor.rgb,vec3(1./gamma));

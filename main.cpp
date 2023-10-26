@@ -80,7 +80,7 @@ int main() {
 
   // set Material parameter
   // ----------------------
-  dym::rdt::Material mat({1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {0.5, 0.5, 0.5},
+  dym::rdt::Material mat({0.2, 0.2, 0.2}, {1.0, 1.0, 1.0}, {0.5, 0.5, 0.5},
                          32.);
 
   glm::vec3 F0(0.04f);
@@ -126,7 +126,7 @@ int main() {
   // properties of the camera
   const float zNear = 0.1f;
   const float zFar = 100.0f;
-  const float aspect = 1.0f;
+  const float aspect = SCR_WIDTH/SCR_HEIGHT;
   const float fovy = glm::radians(45.0f);
 
   // the interval for each rotation of the light source
@@ -189,7 +189,8 @@ int main() {
       s.use();
       // TODO: calculate the model transformation matrix
       // S*T*R? R*S*T? etc. Think about it and then fill in your answer.
-      s.setMat4("model", glm::mat4(1.f)*R*S*T);
+      // rotate first, translate latter, scale whenever
+      s.setMat4("model", glm::mat4(1.f)*S*T*R);
       s.setVec3("viewPos", camera.Position);
       s.setMaterial("material", mat);
       s.setLightMaterial("light", lmat);
@@ -220,6 +221,7 @@ int main() {
     skyboxShader.use();
     skyboxShader.setTexture("skybox", skybox.texture);
     skyboxShader.setVec3("offset", camera.Position);
+    skyboxShader.setInt("skyboxOn", 1);
     // draw
     skybox.Draw(skyboxShader);
 
