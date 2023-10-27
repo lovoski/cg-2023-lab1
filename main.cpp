@@ -2,6 +2,7 @@
 #include "glm/trigonometric.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "quaternion.hpp"
 
 #include "config.h"
 
@@ -48,7 +49,8 @@ int main() {
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) { return; };
   // glm::vec3 modelScaler(1.);
   // glm::vec3 initTranslater(0, -10, 0);
-  // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // lvk::quaternion initRotate(1.0f, 0.0f, 0.0f, 0.0f);
 
   // 3. cerberus gun
   dym::rdt::Model ourModel(
@@ -71,8 +73,10 @@ int main() {
   setReflect = true;
   glm::vec3 modelScaler(0.05f);
   glm::vec3 initTranslater(0);
-  glm::quat initRotate = glm::quat(glm::radians(glm::vec3(0, 90, 0))) *
-                         glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
+  // glm::quat initRotate = glm::quat(glm::radians(glm::vec3(0, 90, 0))) *
+  //                        glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
+  lvk::quaternion initRotate = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)))*
+                         lvk::from_euler_angles(glm::radians(glm::vec3(-90.0f, 0.0f, 0.0f)));
 
   // moving light Cube
   // -----------------
@@ -119,15 +123,16 @@ int main() {
   // set lightCube position and rotate
   // ---------------------------------------
   lmat.position = {10, 0, 0};
-  glm::quat lightR(glm::radians(glm::vec3(0, 2, 0)));
+  // glm::quat lightR(glm::radians(glm::vec3(0, 2, 0)));
+  lvk::quaternion lightR = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 2.0f, 0.0f)));
   // NOTE: you can use qprint to check quaterion's value
   // qprint(lightR.w, lightR.x, lightR.y, lightR.z);
 
   // properties of the camera
-  const float zNear = 0.1f;
-  const float zFar = 100.0f;
-  const float aspect = SCR_WIDTH/SCR_HEIGHT;
-  const float fovy = glm::radians(45.0f);
+  float zNear = 0.1f;
+  float zFar = 100.0f;
+  float aspect = SCR_WIDTH*1.0f/SCR_HEIGHT;
+  float fovy = glm::radians(90.0f);
 
   // the interval for each rotation of the light source
   // unit in seconds
@@ -175,9 +180,42 @@ int main() {
     proj_ubuffer.setMat4(1, view);
     proj_ubuffer.close();
 
+    ImGui::Begin("Model transformation");
+    ImGui::SliderFloat("scale.x", &(modelScaler.x), 0, 1,
+                       "scale.x = %.2f");
+    ImGui::SliderFloat("scale.y", &(modelScaler.y), 0, 1,
+                       "scale.y = %.2f");
+    ImGui::SliderFloat("scale.z", &(modelScaler.z), 0, 1,
+                       "scale.z = %.2f");
+    ImGui::SliderFloat("translate.x", &(initTranslater.x), -10, 10,
+                       "translate.x = %.2f");
+    ImGui::SliderFloat("translate.y", &(initTranslater.y), -10, 10,
+                       "translate.y = %.2f");
+    ImGui::SliderFloat("translate.z", &(initTranslater.z), -10, 10,
+                       "translate.z = %.2f");
+    // ImGui::SliderFloat("rotate.x", &(modelScaler.x), 0, 1,
+    //                    "rotate.x = %.2f");
+    // ImGui::SliderFloat("rotate.y", &(modelScaler.y), 0, 1,
+    //                    "rotate.y = %.2f");
+    // ImGui::SliderFloat("rotate.z", &(modelScaler.z), 0, 1,
+    //                    "rotate.z = %.2f");
+    ImGui::End();
+
+    ImGui::Begin("Camera settings");
+    ImGui::SliderFloat("zNear", &(zNear), 0, 1,
+                       "zNear = %.2f");
+    ImGui::SliderFloat("zFar", &(zFar), 50, 100,
+                       "zFar = %.1f");
+    ImGui::SliderFloat("aspect", &(aspect), 0.5, 2,
+                       "aspect = %.2f");
+    ImGui::SliderFloat("fovy", &(fovy), glm::radians(45.0f), glm::radians(140.0f),
+                       "fovy = %.1f");
+    ImGui::End();
+
     // TODO: calculate model transform matrix
     // rotate: convert initRotate to glm::mat4
-    glm::mat4 R = glm::mat4_cast(initRotate);
+    // glm::mat4 R = glm::mat4_cast(initRotate);
+    glm::mat4 R = glm::transpose(initRotate.to_mat4());
     // translate: convert initTranslater to glm::mat4
     glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
     // scale: convert modelScaler to glm::mat4
@@ -190,7 +228,7 @@ int main() {
       // TODO: calculate the model transformation matrix
       // S*T*R? R*S*T? etc. Think about it and then fill in your answer.
       // rotate first, translate latter, scale whenever
-      s.setMat4("model", glm::mat4(1.f)*S*T*R);
+      s.setMat4("model", glm::mat4(1.f)*T*R*S);
       s.setVec3("viewPos", camera.Position);
       s.setMaterial("material", mat);
       s.setLightMaterial("light", lmat);

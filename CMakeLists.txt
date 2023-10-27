@@ -197,3 +197,9 @@ endforeach(MAIN_PATH)
 
 # include file
 include_directories(${HelloGL_include_dirs})
+
+option(BUILD_TESTS "Build tests." ON)
+
+if(${BUILD_TESTS})
+  add_subdirectory(tests)
+endif(${BUILD_TESTS})

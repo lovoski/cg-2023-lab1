@@ -47,6 +47,10 @@ void processInput(GLFWwindow *window) {
       camera.ProcessKeyboard(dym::rdt::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.ProcessKeyboard(dym::rdt::RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+      camera.ProcessKeyboard(dym::rdt::UP, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+      camera.ProcessKeyboard(dym::rdt::DOWN, deltaTime);
   }
 
   // process mouse input
