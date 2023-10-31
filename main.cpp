@@ -139,6 +139,8 @@ int main() {
   const double rotation_interval = 0.05;
   double rotation_timer = 0;
 
+  bool enableSkyLight = true;
+
   // render loop
   // -----------
   gui.update([&]() {
@@ -155,7 +157,92 @@ int main() {
     // mygui update
     myimgui.Update();
     // render imgui
-    ImGuiContents(mat, lmat, skylightIntensity, gamma, F0);
+    {
+      ImGui::Begin("Settings");
+      if constexpr (false)
+        ImGui::ShowDemoWindow();
+      ImGui::Text("Object's Material Settings");
+      ImGui::SliderFloat("objmat.ambient.r", &(mat.ambient[0]), 0, 1,
+                         "ambient.r = %.2f");
+      ImGui::SliderFloat("objmat.ambient.g", &(mat.ambient[1]), 0, 1,
+                         "ambient.g = %.2f");
+      ImGui::SliderFloat("objmat.ambient.b", &(mat.ambient[2]), 0, 1,
+                         "ambient.b = %.2f");
+      ImGui::SliderFloat("objmat.diffuse.x", &(mat.diffuse[0]), 0, 1,
+                         "diffuse.x = %.2f");
+      ImGui::SliderFloat("objmat.diffuse.y", &(mat.diffuse[1]), 0, 1,
+                         "diffuse.y = %.2f");
+      ImGui::SliderFloat("objmat.diffuse.z", &(mat.diffuse[2]), 0, 1,
+                         "diffuse.z = %.2f");
+      ImGui::SliderFloat("objmat.specular.x", &(mat.specular[0]), 0, 1,
+                         "specular.x = %.2f");
+      ImGui::SliderFloat("objmat.specular.y", &(mat.specular[1]), 0, 1,
+                         "specular.y = %.2f");
+      ImGui::SliderFloat("objmat.specular.z", &(mat.specular[2]), 0, 1,
+                         "specular.z = %.2f");
+      ImGui::SliderFloat("F0.x", &(F0[0]), 0, 1, "F0.x = %.2f");
+      ImGui::SliderFloat("F0.y", &(F0[1]), 0, 1, "F0.y = %.2f");
+      ImGui::SliderFloat("F0.z", &(F0[2]), 0, 1, "F0.z = %.2f");
+      ImGui::SliderFloat("shininess", &(mat.shininess), 0, 1, "shininess = %.2f");
+      ImGui::SliderFloat("skylightIntensity", &(skylightIntensity), 0, 5,
+                         "intensity = %.2f");
+      ImGui::Checkbox("enable skylight", &enableSkyLight);
+      ImGui::Text("Light Settings");
+      ImGui::SliderFloat("light.ambient.r", &(lmat.ambient[0]), 0, 1,
+                         "ambient.r = %.2f");
+      ImGui::SliderFloat("light.ambient.g", &(lmat.ambient[1]), 0, 1,
+                         "ambient.g = %.2f");
+      ImGui::SliderFloat("light.ambient.b", &(lmat.ambient[2]), 0, 1,
+                         "ambient.b = %.2f");
+      ImGui::SliderFloat("light.diffuse.x", &(lmat.diffuse[0]), 0, 1,
+                         "diffuse.x = %.2f");
+      ImGui::SliderFloat("light.diffuse.y", &(lmat.diffuse[1]), 0, 1,
+                         "diffuse.y = %.2f");
+      ImGui::SliderFloat("light.diffuse.z", &(lmat.diffuse[2]), 0, 1,
+                         "diffuse.z = %.2f");
+      ImGui::SliderFloat("light.specular.x", &(lmat.specular[0]), 0, 1,
+                         "specular.x = %.2f");
+      ImGui::SliderFloat("light.specular.y", &(lmat.specular[1]), 0, 1,
+                         "specular.y = %.2f");
+      ImGui::SliderFloat("light.specular.z", &(lmat.specular[2]), 0, 1,
+                         "specular.z = %.2f");
+      ImGui::SliderFloat("gamma", &(gamma), 1, 3, "gamma = %.2f");
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                  1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::End();
+
+      ImGui::Begin("Model transformation");
+      ImGui::SliderFloat("scale.x", &(modelScaler.x), 0, 1,
+                         "scale.x = %.2f");
+      ImGui::SliderFloat("scale.y", &(modelScaler.y), 0, 1,
+                         "scale.y = %.2f");
+      ImGui::SliderFloat("scale.z", &(modelScaler.z), 0, 1,
+                         "scale.z = %.2f");
+      ImGui::SliderFloat("translate.x", &(initTranslater.x), -10, 10,
+                         "translate.x = %.2f");
+      ImGui::SliderFloat("translate.y", &(initTranslater.y), -10, 10,
+                         "translate.y = %.2f");
+      ImGui::SliderFloat("translate.z", &(initTranslater.z), -10, 10,
+                         "translate.z = %.2f");
+      // ImGui::SliderFloat("rotate.x", &(modelScaler.x), 0, 1,
+      //                    "rotate.x = %.2f");
+      // ImGui::SliderFloat("rotate.y", &(modelScaler.y), 0, 1,
+      //                    "rotate.y = %.2f");
+      // ImGui::SliderFloat("rotate.z", &(modelScaler.z), 0, 1,
+      //                    "rotate.z = %.2f");
+      ImGui::End();
+
+      ImGui::Begin("Camera settings");
+      ImGui::SliderFloat("zNear", &(zNear), 0, 1,
+                         "zNear = %.2f");
+      ImGui::SliderFloat("zFar", &(zFar), 50, 100,
+                         "zFar = %.1f");
+      ImGui::SliderFloat("aspect", &(aspect), 0.5, 2,
+                         "aspect = %.2f");
+      ImGui::SliderFloat("fovy", &(fovy), glm::radians(45.0f), glm::radians(140.0f),
+                         "fovy = %.1f");
+      ImGui::End();
+    }
 
     // render
     // ------
@@ -179,38 +266,6 @@ int main() {
     proj_ubuffer.setMat4(0, projection);
     proj_ubuffer.setMat4(1, view);
     proj_ubuffer.close();
-
-    ImGui::Begin("Model transformation");
-    ImGui::SliderFloat("scale.x", &(modelScaler.x), 0, 1,
-                       "scale.x = %.2f");
-    ImGui::SliderFloat("scale.y", &(modelScaler.y), 0, 1,
-                       "scale.y = %.2f");
-    ImGui::SliderFloat("scale.z", &(modelScaler.z), 0, 1,
-                       "scale.z = %.2f");
-    ImGui::SliderFloat("translate.x", &(initTranslater.x), -10, 10,
-                       "translate.x = %.2f");
-    ImGui::SliderFloat("translate.y", &(initTranslater.y), -10, 10,
-                       "translate.y = %.2f");
-    ImGui::SliderFloat("translate.z", &(initTranslater.z), -10, 10,
-                       "translate.z = %.2f");
-    // ImGui::SliderFloat("rotate.x", &(modelScaler.x), 0, 1,
-    //                    "rotate.x = %.2f");
-    // ImGui::SliderFloat("rotate.y", &(modelScaler.y), 0, 1,
-    //                    "rotate.y = %.2f");
-    // ImGui::SliderFloat("rotate.z", &(modelScaler.z), 0, 1,
-    //                    "rotate.z = %.2f");
-    ImGui::End();
-
-    ImGui::Begin("Camera settings");
-    ImGui::SliderFloat("zNear", &(zNear), 0, 1,
-                       "zNear = %.2f");
-    ImGui::SliderFloat("zFar", &(zFar), 50, 100,
-                       "zFar = %.1f");
-    ImGui::SliderFloat("aspect", &(aspect), 0.5, 2,
-                       "aspect = %.2f");
-    ImGui::SliderFloat("fovy", &(fovy), glm::radians(45.0f), glm::radians(140.0f),
-                       "fovy = %.1f");
-    ImGui::End();
 
     // TODO: calculate model transform matrix
     // rotate: convert initRotate to glm::mat4
@@ -247,6 +302,14 @@ int main() {
       return modelShader;
     });
 
+    T = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+
+    // draw the same model with different translate matrix
+    ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
+      setmodelShader(modelShader, m);
+      return modelShader;
+    });
+
     // load light value and draw light object
     lightShader.use();
     lightShader.setMat4("model", glm::mat4(1.f));
@@ -259,7 +322,7 @@ int main() {
     skyboxShader.use();
     skyboxShader.setTexture("skybox", skybox.texture);
     skyboxShader.setVec3("offset", camera.Position);
-    skyboxShader.setInt("skyboxOn", 1);
+    skyboxShader.setBool("enableSkyLight", enableSkyLight);
     // draw
     skybox.Draw(skyboxShader);
 
@@ -272,73 +335,4 @@ int main() {
 
   // after main end, GUI will be closed by ~GUI() automatically.
   return 0;
-}
-
-template <typename MatType, typename LightMatType>
-void ImGuiContents(MatType &mat, LightMatType &lMat, float &skylightlevel,
-                   float &gamma, glm::vec3 &F0) {
-  ImGui::Begin("Settings");
-
-  if constexpr (false)
-    ImGui::ShowDemoWindow();
-
-  ImGui::Text("Object's Material Settings");
-
-  ImGui::SliderFloat("objmat.ambient.r", &(mat.ambient[0]), 0, 1,
-                     "ambient.r = %.2f");
-  ImGui::SliderFloat("objmat.ambient.g", &(mat.ambient[1]), 0, 1,
-                     "ambient.g = %.2f");
-  ImGui::SliderFloat("objmat.ambient.b", &(mat.ambient[2]), 0, 1,
-                     "ambient.b = %.2f");
-
-  ImGui::SliderFloat("objmat.diffuse.x", &(mat.diffuse[0]), 0, 1,
-                     "diffuse.x = %.2f");
-  ImGui::SliderFloat("objmat.diffuse.y", &(mat.diffuse[1]), 0, 1,
-                     "diffuse.y = %.2f");
-  ImGui::SliderFloat("objmat.diffuse.z", &(mat.diffuse[2]), 0, 1,
-                     "diffuse.z = %.2f");
-
-  ImGui::SliderFloat("objmat.specular.x", &(mat.specular[0]), 0, 1,
-                     "specular.x = %.2f");
-  ImGui::SliderFloat("objmat.specular.y", &(mat.specular[1]), 0, 1,
-                     "specular.y = %.2f");
-  ImGui::SliderFloat("objmat.specular.z", &(mat.specular[2]), 0, 1,
-                     "specular.z = %.2f");
-
-  ImGui::SliderFloat("F0.x", &(F0[0]), 0, 1, "F0.x = %.2f");
-  ImGui::SliderFloat("F0.y", &(F0[1]), 0, 1, "F0.y = %.2f");
-  ImGui::SliderFloat("F0.z", &(F0[2]), 0, 1, "F0.z = %.2f");
-
-  ImGui::SliderFloat("shininess", &(mat.shininess), 0, 1, "shininess = %.2f");
-
-  ImGui::SliderFloat("skylightIntensity", &(skylightlevel), 0, 5,
-                     "intensity = %.2f");
-
-  ImGui::Text("Light Settings");
-
-  ImGui::SliderFloat("light.ambient。r", &(lMat.ambient[0]), 0, 1,
-                     "ambient.r = %.2f");
-  ImGui::SliderFloat("light.ambient。g", &(lMat.ambient[1]), 0, 1,
-                     "ambient.g = %.2f");
-  ImGui::SliderFloat("light.ambient。b", &(lMat.ambient[2]), 0, 1,
-                     "ambient.b = %.2f");
-
-  ImGui::SliderFloat("light.diffuse.x", &(lMat.diffuse[0]), 0, 1,
-                     "diffuse.x = %.2f");
-  ImGui::SliderFloat("light.diffuse.y", &(lMat.diffuse[1]), 0, 1,
-                     "diffuse.y = %.2f");
-  ImGui::SliderFloat("light.diffuse.z", &(lMat.diffuse[2]), 0, 1,
-                     "diffuse.z = %.2f");
-
-  ImGui::SliderFloat("light.specular.x", &(lMat.specular[0]), 0, 1,
-                     "specular.x = %.2f");
-  ImGui::SliderFloat("light.specular.y", &(lMat.specular[1]), 0, 1,
-                     "specular.y = %.2f");
-  ImGui::SliderFloat("light.specular.z", &(lMat.specular[2]), 0, 1,
-                     "specular.z = %.2f");
-
-  ImGui::SliderFloat("gamma", &(gamma), 1, 3, "gamma = %.2f");
-  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-              1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-  ImGui::End();
 }

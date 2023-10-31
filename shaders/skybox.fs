@@ -4,12 +4,15 @@ out vec4 FragColor;
 in vec3 TexCoords;
 
 uniform samplerCube skybox;
-uniform int skyboxOn;
+
+uniform bool enableSkyLight;
 
 void main()
 {
-  if (skyboxOn == 1) {
+  if (enableSkyLight) {
     FragColor=texture(skybox,TexCoords);
+  } else {
+    FragColor=vec4(0.,0.,0.,1.);
   }
   // FragColor=vec4(1.,1.,1.,1.);
 }
