@@ -13,8 +13,6 @@ out mat3 TBN;
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-// uniform mat4 view;
-// uniform mat4 projection;
 
 uniform vec3 offsets[2];
 
@@ -22,7 +20,7 @@ void main()
 {
   vec3 offset=offsets[gl_InstanceID];
   TexCoords=aTexCoords;
-  // Normal=aNormal;
+  // Normal = mat3(transpose(inverse(model)))*aNormal;
   FragPos=vec3(model*vec4(aPos+offset,1.));
   gl_Position=projection*view*model*vec4(aPos+offset,1.);
   vec3 T=normalize(vec3(model*vec4(tangent,0.)));
