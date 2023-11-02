@@ -75,10 +75,14 @@ void main()
     // attenuation
     float dist = length(lights[i].position - FragPos);
     float attenuation = 1.0 / (1.0 + lights[i].linear * dist + lights[i].quadratic * dist * dist);
-    diffuse *= attenuation;
-    specular *= attenuation;
+
+    vec3 reflectDir = reflect(-viewDir, Normal);
+    vec3 skyReflection = skylightIntensity*(texture(skybox, reflectDir).rgb);
+
+    diffuse *= (attenuation+skyReflection);
+    specular *= (attenuation+skyReflection);
     lighting += diffuse + specular;
   }
   FragColor = vec4(lighting, 1.0);
-  // FragColor = vec4(Normal, 1.0);
+  FragColor.rgb=pow(FragColor.rgb,vec3(1./gamma));
 }
