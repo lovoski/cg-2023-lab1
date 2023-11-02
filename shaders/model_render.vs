@@ -26,14 +26,17 @@ void main()
   // Normal=aNormal;
   FragPos=vec3(model*vec4(aPos,1.));
 
-  // TODO: transform position
   gl_Position=vec4(aPos,1.);
   gl_Position=projection*view*model*gl_Position;
 
   // transform the normal vector with the vertices
-  vec3 normal = mat3(transpose(inverse(model)))*aNormal;
+  mat3 NormalMatrix = mat3(transpose(inverse(model)));
+  vec3 T, B, N;
+  T = normalize(NormalMatrix * tangent);
+  N = normalize(NormalMatrix * aNormal);
+  T = normalize(T - dot(T, N) * N);
+  B = cross(N, T);
 
-  // TODO: calculate TBN matrix
   // Output TBN to fragment shader
-  TBN=mat3(tangent, bitangent, normal);
+  TBN=mat3(T, B, N);
 }
