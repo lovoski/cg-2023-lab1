@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 layout(location=0)in vec3 aPos;
 layout(location=1)in vec3 aNormal;
 layout(location=2)in vec2 aTexCoords;
@@ -18,13 +18,21 @@ uniform vec3 offsets[2];
 
 void main()
 {
-  vec3 offset=offsets[gl_InstanceID];
   TexCoords=aTexCoords;
-  // Normal = mat3(transpose(inverse(model)))*aNormal;
-  FragPos=vec3(model*vec4(aPos+offset,1.));
-  gl_Position=projection*view*model*vec4(aPos+offset,1.);
-  vec3 T=normalize(vec3(model*vec4(tangent,0.)));
-  vec3 B=normalize(vec3(model*vec4(bitangent,0.)));
-  vec3 N=normalize(vec3(model*vec4(aNormal,0.)));
-  TBN=mat3(T,B,N);
+  // Normal=aNormal;
+  FragPos=vec3(model*vec4(aPos,1.));
+
+  gl_Position=vec4(aPos,1.);
+  gl_Position=projection*view*model*gl_Position;
+
+  // transform the normal vector with the vertices
+  mat3 NormalMatrix = mat3(transpose(inverse(model)));
+  vec3 T, B, N;
+  T = normalize(NormalMatrix * tangent);
+  N = normalize(NormalMatrix * aNormal);
+  T = normalize(T - dot(T, N) * N);
+  B = cross(N, T);
+
+  // Output TBN to fragment shader
+  TBN=mat3(T, B, N);
 }

@@ -3,15 +3,17 @@ out vec4 FragColor;
 
 in vec2 TexCoords;
 // in vec3 Normal;
-in vec3 FragPos;
-in mat3 TBN;
 
 // layout(std140,binding=0)uniform Object{samplerCube skybox;};
 
-uniform sampler2D texture_diffuse1;
-uniform sampler2D texture_specular1;
-uniform sampler2D texture_normal1;
-uniform sampler2D texture_height1;
+// uniform sampler2D texture_diffuse1;
+// uniform sampler2D texture_specular1;
+// uniform sampler2D texture_normal1;
+// uniform sampler2D texture_height1;
+
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gAlbedoSpec;
 
 struct Light{
   vec3 position;
@@ -25,15 +27,11 @@ struct Light{
   float quadratic;
 };
 
-uniform Light light;
+const int NR_LIGHTS = 10;
+uniform Light lights[NR_LIGHTS];
 
 uniform float skylightIntensity;
-
-// view
 uniform vec3 viewPos;
-
-// Color
-// uniform vec3 ambient;
 
 // material
 struct Material{
@@ -44,13 +42,9 @@ struct Material{
 };
 
 uniform Material material;
-
 uniform samplerCube skybox;
-
 uniform float gamma;
-
 uniform bool existHeigTex;
-
 uniform vec3 F0;
 
 vec3 fresnelSchlick(float cosTheta,vec3 F0)
@@ -60,58 +54,31 @@ vec3 fresnelSchlick(float cosTheta,vec3 F0)
 
 void main()
 {
-  vec3 objColor=vec3(texture(texture_diffuse1,TexCoords));
-  vec3 objSpec=vec3(texture(texture_specular1,TexCoords));
-  vec3 objNorm=vec3(texture(texture_normal1,TexCoords));
-  vec3 objheig=vec3(0.);
-  if(existHeigTex){
-    objheig=vec3(texture(texture_height1,TexCoords));
+  // retrieve data from gbuffer
+  vec3 FragPos = texture(gPosition, TexCoords).rgb;
+  vec3 Normal = texture(gNormal, TexCoords).rgb;
+  vec3 Diffuse = texture(gAlbedoSpec, TexCoords).rgb;
+  float Specular = texture(gAlbedoSpec, TexCoords).a;
+
+  // then calculate lighting as usual
+  vec3 lighting  = Diffuse * 0.1; // hard-coded ambient component
+  vec3 viewDir  = normalize(viewPos - FragPos);
+  for(int i = 0; i < NR_LIGHTS; ++i)
+  {
+    // diffuse
+    vec3 lightDir = normalize(lights[i].position - FragPos);
+    vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Diffuse * lights[i].diffuse;
+    // specular
+    vec3 halfwayDir = normalize(lightDir + viewDir);  
+    float spec = pow(max(dot(Normal, halfwayDir), 0.0), material.shininess);
+    vec3 specular = lights[i].specular * spec * Specular;
+    // attenuation
+    float dist = length(lights[i].position - FragPos);
+    float attenuation = 1.0 / (1.0 + lights[i].linear * dist + lights[i].quadratic * dist * dist);
+    diffuse *= attenuation;
+    specular *= attenuation;
+    lighting += diffuse + specular;
   }
-
-  vec3 objH=max(objheig,.05);
-
-  vec3 norm=normalize(TBN*normalize(objNorm*2.-1.));
-  vec3 lightPos=light.position;
-
-  vec3 ambient=light.ambient*material.ambient;
-
-  // TODO: view direction: lightDir, viewDir and halfwayDir
-  vec3 viewDir = normalize(viewPos-FragPos);
-  vec3 lightDir = normalize(lightPos-FragPos);
-  // replace v*r with h*n
-  vec3 halfwayDir = normalize(lightDir+viewDir);
-
-  // TODO: scatter term
-  vec3 diffuse;
-  diffuse = light.diffuse*material.diffuse*(max(dot(lightDir, norm), 0.));
-
-  // TODO: specular reflect term
-  vec3 specular;
-  // use the spec parameter from spec map
-  specular = light.specular*material.specular*objSpec*pow(max(dot(halfwayDir, norm), 0.), material.shininess);
-
-  // TODO: attenuation
-  float dist = length(light.position - FragPos);
-  float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * (dist * dist));
-
-  // TODO: SkyBox reflect term
-  // NOTE: you should add fresnel reflection here!
-  // vec3 F0=vec3(.04);
-  vec3 F0_=mix(F0,objColor,objSpec);
-  // the reflect function viewDirection is oppsite to blinn-phong model
-  vec3 reflectDir = reflect(-viewDir, norm);
-  vec3 F = vec3(0.);
-  vec3 sky;
-  sky = skylightIntensity*(texture(skybox, reflectDir).rgb);
-  // sky = (objH.r+F*.3)*sky;
-
-  vec3 result=(ambient+diffuse+specular)*objColor*(attenuation+sky);
-  // vec3 result=sky;
-  // vec3 result = F;
-
-  FragColor=vec4(result,1.);
-
-  // TODO: do gamma correction here
-  // gamma
-  FragColor.rgb=pow(FragColor.rgb,vec3(1./gamma));
+  FragColor = vec4(lighting, 1.0);
+  // FragColor = vec4(Normal, 1.0);
 }

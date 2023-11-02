@@ -4,10 +4,38 @@
 #include <glm/gtc/quaternion.hpp>
 #include "quaternion.hpp"
 
-#include "core/renderTools/object/frameBuffer.hpp"
 #include "core/renderTools/object/gbuffer.hpp"
 
 #include "config.h"
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
 
 int main() {
   // init gui and imgui
@@ -40,9 +68,6 @@ int main() {
   // shader for gbuffer
   dym::rdt::Shader gbufferShader(SOURCE_DIR "/shaders/gbuffer/gbuffer.vs", SOURCE_DIR "/shaders/gbuffer/gbuffer.fs");
 
-  // g-buffer
-  dym::rdo::GBuffer gbuffer;
-
   // position for objects
   float dist = 5.0f;
   glm::vec3 modelPositions[9] {
@@ -57,16 +82,16 @@ int main() {
     glm::vec3(-dist, -dist, -dist),
   };
 
-  const unsigned int NR_LIGHTS = 100;
+  const unsigned int NR_LIGHTS = 10;
   std::vector<glm::vec3> lightPositions;
   std::vector<glm::vec3> lightColors;
   srand(13);
   for (unsigned int i = 0; i < NR_LIGHTS; i++)
   {
     // calculate slightly random offsets
-    float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
-    float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
-    float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+    float xPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
+    float yPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
+    float zPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
     lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
     // also calculate random color
     float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
@@ -77,13 +102,15 @@ int main() {
 
   // load models
   // -----------
+
   // // 1. backpack
   // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/backpack/backpack.obj");
   // modelShader.setTexture("texture_height1", 0);
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) { return; };
   // glm::vec3 modelScaler(1.);
   // glm::vec3 initTranslater(0.);
-  // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // lvk::quaternion initRotate(1.0f, 0.0f, 0.0f, 0.0f);
 
   // // 2. nanosuit
   // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/nanosuit/nanosuit.obj");
@@ -153,11 +180,8 @@ int main() {
   proj_ubuffer.bindShader(modelShader, "Object");
   proj_ubuffer.bindShader(skyboxShader, "Object");
   proj_ubuffer.bindShader(lightShader, "Object");
-  proj_ubuffer.bindShader(gbufferShader, "Object");
 
-  // time recorder
-  // -------------
-  int i = 0;
+  dym::rdo::GBuffer GBuffer("GBuffer", SCR_WIDTH, SCR_HEIGHT);
 
   camera.Position = {0, 0, 20};
   camera.MouseSensitivity = 0.1f;
@@ -173,14 +197,19 @@ int main() {
   // properties of the camera
   float zNear = 0.1f;
   float zFar = 100.0f;
-  float aspect = SCR_WIDTH*1.0f/SCR_HEIGHT;
+  float aspect = (float)SCR_WIDTH/(float)SCR_HEIGHT;
 
   // the interval for each rotation of the light source
   // unit in seconds
   const double rotation_interval = 0.05;
   double rotation_timer = 0;
 
-  bool enableSkyLight = true;
+  bool enableSkyLight = false;
+
+  modelShader.use();
+  modelShader.setInt("gPosition", 0);
+  modelShader.setInt("gNormal", 1);
+  modelShader.setInt("gAlbedoSpec", 2);
 
   // render loop
   // -----------
@@ -194,6 +223,8 @@ int main() {
     // accept and process all keyboard and mouse input
     // ----------------------------
     processInput(gui.window);
+
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     // mygui update
     myimgui.Update();
@@ -285,24 +316,14 @@ int main() {
       ImGui::End();
     }
 
-    // // start geometry passing
-    // // replace default frame buffer with gbuffer
-    // gbuffer.use();
-    // // use gbuffershader, pass model, view, perspective matrix to the shader
-    // gbufferShader.use();
-    // render
-    // ------
-    // TODO: use gl api to clear framebuffer and depthbuffer
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-    // TODO: light position rotate
     // use quat lightR to rotate lightbox
     if (currentFrame-rotation_timer >= rotation_interval) {
-      lmat.position = lightR*lmat.position;
+      for (auto &pos : lightPositions) {
+        pos = lightR*pos;
+      }
       rotation_timer = currentFrame;
     }
 
-    // TODO: create projection matrix
     // use glm to create projection and view matrix
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), aspect, zNear, zFar);
     glm::mat4 view = camera.GetViewMatrix();
@@ -313,7 +334,6 @@ int main() {
     proj_ubuffer.setMat4(1, view);
     proj_ubuffer.close();
 
-    // TODO: calculate model transform matrix
     // rotate: convert initRotate to glm::mat4
     // glm::mat4 R = glm::mat4_cast(initRotate);
     glm::mat4 R = glm::transpose(initRotate.to_mat4());
@@ -323,48 +343,69 @@ int main() {
     glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
 
-    // for (auto &pos : modelPositions) {
-    //   ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-    //     T = glm::translate(glm::mat4(1.0f), pos);
-    //     gbufferShader.setMat4("model", T*R*S);
-    //     return gbufferShader;
-    //   });
-    // }
-
-    // load all value we need into shader
-    auto setmodelShader = [&](dym::rdt::Shader &s, dym::rdt::Mesh &m) {
-      s.use();
-      // TODO: calculate the model transformation matrix
-      // S*T*R? R*S*T? etc. Think about it and then fill in your answer.
-      // rotate first, translate latter, scale whenever
-      s.setMat4("model", glm::mat4(1.f)*T*R*S);
-      s.setVec3("viewPos", camera.Position);
-      s.setMaterial("material", mat);
-      s.setLightMaterial("light", lmat);
-      s.setTexture("skybox", skybox.texture);
-      s.setFloat("skylightIntensity", skylightIntensity);
-      bindOtherTexture(s);
-      s.setFloat("gamma", gamma);
-      s.setVec3("F0", F0);
-
-      s.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
-    };
+    // 1. start geometry passing
+    GBuffer.use();
+    gbufferShader.use();
+    gbufferShader.setMat4("projection", projection);
+    gbufferShader.setMat4("view", view);
 
     for (auto &pos : modelPositions) {
+      // translate matrix for each object
       T = glm::translate(glm::mat4(1.0f), pos);
-      ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-        setmodelShader(modelShader, m);
-        return modelShader;
-      });
+      // set model matrix to gbuffer vertex shader
+      gbufferShader.setMat4("model", T*R*S);
+      bindOtherTexture(gbufferShader);
+      ourModel.Draw(gbufferShader);
     }
+    GBuffer.close();
+
+    // 2. end geometry passing, start lighting passing
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    modelShader.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, GBuffer.gPosition);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, GBuffer.gNormal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, GBuffer.gAlbedoSpec);
+    // send light relevant uniforms
+    for (unsigned int i = 0; i < lightPositions.size(); i++)
+    {
+      modelShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+      modelShader.setVec3("lights[" + std::to_string(i) + "].diffuse", lightColors[i]);
+      modelShader.setVec3("lights[" + std::to_string(i) + "].specular", lightColors[i]);
+      // update attenuation parameters and calculate radius
+      modelShader.setFloat("lights[" + std::to_string(i) + "].linear", lmat.linear);
+      modelShader.setFloat("lights[" + std::to_string(i) + "].quadratic", lmat.quadratic);
+    }
+    modelShader.setVec3("viewPos", camera.Position);
+    modelShader.setMaterial("material", mat);
+    modelShader.setTexture("skybox", skybox.texture);
+    modelShader.setFloat("gamma", gamma);
+    modelShader.setFloat("skylightIntensity", skylightIntensity);
+    modelShader.setVec3("F0", F0);
+
+    // finally render quad
+    renderQuad();
+
+    // 2.5. copy content of geometry's depth buffer to default framebuffer's depth buffer
+    // ----------------------------------------------------------------------------------
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, GBuffer.gbuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+    // blit to default framebuffer. Note that this may or may not work as the internal formats of both the FBO and default framebuffer have to match.
+    // the internal formats are implementation defined. This works on all of my systems, but if it doesn't on yours you'll likely have to write to the 		
+    // depth buffer in another shader stage (or somehow see to match the default framebuffer's internal format with the FBO's internal format).
+    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // load light value and draw light object
     lightShader.use();
     lightShader.setMat4("model", glm::mat4(1.f));
-    lightShader.setVec3("lightPos", lmat.position);
-    lightShader.setVec3("lightColor", lmat.ambient);
-    // draw
-    lightCube.Draw(lightShader);
+    for (unsigned int i = 0; i < NR_LIGHTS; ++i) {
+      lightShader.setVec3("lightColor", lightColors[i]);
+      lightShader.setVec3("lightPos", lightPositions[i]);
+      lightCube.Draw(lightShader);
+    }
 
     // load skybox value and draw skybox
     skyboxShader.use();
