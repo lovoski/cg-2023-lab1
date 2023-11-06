@@ -4,37 +4,67 @@
 #include <glm/gtc/quaternion.hpp>
 #include "quaternion.hpp"
 
+#include <vector>
+
 #include "core/renderTools/object/gbuffer.hpp"
 
 #include "config.h"
 
+const unsigned int NLIGHTS = 10;
+
+void fill_model_pos(std::vector<glm::vec3> &modelPos) {
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      modelPos.emplace_back(glm::vec3(-10.0f+10.0f*i, 0, -10.0f+10.0f*j));
+    }
+  }
+}
+void fill_light_pos(std::vector<glm::vec3> &lightPos) {
+  srand(13);
+  float x, y, z;
+  for (int i = 0; i < NLIGHTS; ++i) {
+    x = ((rand()%100)/100.0f)*40.0f-20.0f;
+    y = ((rand()%100)/100.0f)*40.0f-20.0f;
+    z = ((rand()%100)/100.0f)*40.0f-20.0f;
+    lightPos.emplace_back(glm::vec3(x, y, z));
+  }
+}
+void fill_light_color(std::vector<glm::vec3> &lightColor) {
+  srand(13);
+  float r, g, b;
+  for (int i = 0; i < NLIGHTS; ++i) {
+    r = (rand()%100)/200.0f+0.5f;
+    g = (rand()%100)/200.0f+0.5f;
+    b = (rand()%100)/200.0f+0.5f;
+    lightColor.emplace_back(glm::vec3(r, g, b));
+  }
+}
+
 unsigned int quadVAO = 0;
 unsigned int quadVBO;
-void renderQuad()
-{
-    if (quadVAO == 0)
-    {
-        float quadVertices[] = {
-            // positions        // texture Coords
-            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-        };
-        // setup plane VAO
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    }
+void renderQuad(){
+  if (quadVAO == 0){
+    float quadVertices[] = {
+        // positions        // texture Coords
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
+    // setup plane VAO
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
     glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+  }
+  glBindVertexArray(quadVAO);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  glBindVertexArray(0);
 }
 
 int main() {
@@ -64,41 +94,17 @@ int main() {
                                SOURCE_DIR  "/shaders/lightbox.fs");
   // load sky box shader
   dym::rdt::Shader skyboxShader(SOURCE_DIR  "/shaders/skybox.vs", SOURCE_DIR  "/shaders/skybox.fs");
-
   // shader for gbuffer
   dym::rdt::Shader gbufferShader(SOURCE_DIR "/shaders/gbuffer/gbuffer.vs", SOURCE_DIR "/shaders/gbuffer/gbuffer.fs");
 
   // position for objects
-  float dist = 5.0f;
-  glm::vec3 modelPositions[9] {
-    glm::vec3(0.0f, 0.0f, 0.0f),
-    glm::vec3(dist, dist, dist),
-    glm::vec3(-dist, dist, dist),
-    glm::vec3(dist, -dist, dist),
-    glm::vec3(dist, dist, -dist),
-    glm::vec3(-dist, -dist, dist),
-    glm::vec3(-dist, dist, -dist),
-    glm::vec3(dist, -dist, -dist),
-    glm::vec3(-dist, -dist, -dist),
-  };
+  std::vector<glm::vec3> modelPositions;
+  fill_model_pos(modelPositions);
 
-  const unsigned int NR_LIGHTS = 10;
   std::vector<glm::vec3> lightPositions;
   std::vector<glm::vec3> lightColors;
-  srand(13);
-  for (unsigned int i = 0; i < NR_LIGHTS; i++)
-  {
-    // calculate slightly random offsets
-    float xPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
-    float yPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
-    float zPos = static_cast<float>(((rand() % 100) / 100.0) * 20.0 - 10.0);
-    lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
-    // also calculate random color
-    float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    lightColors.push_back(glm::vec3(rColor, gColor, bColor));
-  }
+  fill_light_pos(lightPositions);
+  fill_light_color(lightColors);
 
   // load models
   // -----------
@@ -255,7 +261,7 @@ int main() {
       ImGui::SliderFloat("F0.x", &(F0[0]), 0, 1, "F0.x = %.2f");
       ImGui::SliderFloat("F0.y", &(F0[1]), 0, 1, "F0.y = %.2f");
       ImGui::SliderFloat("F0.z", &(F0[2]), 0, 1, "F0.z = %.2f");
-      ImGui::SliderFloat("shininess", &(mat.shininess), 0, 1, "shininess = %.2f");
+      ImGui::SliderFloat("shininess", &(mat.shininess), 16, 32, "shininess = %.f");
       ImGui::SliderFloat("skylightIntensity", &(skylightIntensity), 0, 5,
                          "intensity = %.2f");
       ImGui::Checkbox("enable skylight", &enableSkyLight);
@@ -401,7 +407,7 @@ int main() {
     // load light value and draw light object
     lightShader.use();
     lightShader.setMat4("model", glm::mat4(1.f));
-    for (unsigned int i = 0; i < NR_LIGHTS; ++i) {
+    for (unsigned int i = 0; i < NLIGHTS; ++i) {
       lightShader.setVec3("lightColor", lightColors[i]);
       lightShader.setVec3("lightPos", lightPositions[i]);
       lightCube.Draw(lightShader);
