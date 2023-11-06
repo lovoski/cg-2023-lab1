@@ -4,9 +4,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include "quaternion.hpp"
 
-#include "core/renderTools/object/frameBuffer.hpp"
-#include "core/renderTools/object/gbuffer.hpp"
-
 #include "config.h"
 
 int main() {
@@ -36,44 +33,6 @@ int main() {
                                SOURCE_DIR  "/shaders/lightbox.fs");
   // load sky box shader
   dym::rdt::Shader skyboxShader(SOURCE_DIR  "/shaders/skybox.vs", SOURCE_DIR  "/shaders/skybox.fs");
-
-  // shader for gbuffer
-  dym::rdt::Shader gbufferShader(SOURCE_DIR "/shaders/gbuffer/gbuffer.vs", SOURCE_DIR "/shaders/gbuffer/gbuffer.fs");
-
-  // g-buffer
-  dym::rdo::GBuffer gbuffer;
-
-  // position for objects
-  float dist = 5.0f;
-  glm::vec3 modelPositions[9] {
-    glm::vec3(0.0f, 0.0f, 0.0f),
-    glm::vec3(dist, dist, dist),
-    glm::vec3(-dist, dist, dist),
-    glm::vec3(dist, -dist, dist),
-    glm::vec3(dist, dist, -dist),
-    glm::vec3(-dist, -dist, dist),
-    glm::vec3(-dist, dist, -dist),
-    glm::vec3(dist, -dist, -dist),
-    glm::vec3(-dist, -dist, -dist),
-  };
-
-  const unsigned int NR_LIGHTS = 100;
-  std::vector<glm::vec3> lightPositions;
-  std::vector<glm::vec3> lightColors;
-  srand(13);
-  for (unsigned int i = 0; i < NR_LIGHTS; i++)
-  {
-    // calculate slightly random offsets
-    float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
-    float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
-    float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
-    lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
-    // also calculate random color
-    float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
-    lightColors.push_back(glm::vec3(rColor, gColor, bColor));
-  }
 
   // load models
   // -----------
@@ -153,7 +112,6 @@ int main() {
   proj_ubuffer.bindShader(modelShader, "Object");
   proj_ubuffer.bindShader(skyboxShader, "Object");
   proj_ubuffer.bindShader(lightShader, "Object");
-  proj_ubuffer.bindShader(gbufferShader, "Object");
 
   // time recorder
   // -------------
@@ -285,24 +243,16 @@ int main() {
       ImGui::End();
     }
 
-    // // start geometry passing
-    // // replace default frame buffer with gbuffer
-    // gbuffer.use();
-    // // use gbuffershader, pass model, view, perspective matrix to the shader
-    // gbufferShader.use();
     // render
     // ------
-    // TODO: use gl api to clear framebuffer and depthbuffer
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-    // TODO: light position rotate
     // use quat lightR to rotate lightbox
     if (currentFrame-rotation_timer >= rotation_interval) {
       lmat.position = lightR*lmat.position;
       rotation_timer = currentFrame;
     }
 
-    // TODO: create projection matrix
     // use glm to create projection and view matrix
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), aspect, zNear, zFar);
     glm::mat4 view = camera.GetViewMatrix();
@@ -313,29 +263,16 @@ int main() {
     proj_ubuffer.setMat4(1, view);
     proj_ubuffer.close();
 
-    // TODO: calculate model transform matrix
-    // rotate: convert initRotate to glm::mat4
-    // glm::mat4 R = glm::mat4_cast(initRotate);
     glm::mat4 R = glm::transpose(initRotate.to_mat4());
     // translate: convert initTranslater to glm::mat4
-    glm::mat4 T;
+    glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
     // scale: convert modelScaler to glm::mat4
     glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
 
-    // for (auto &pos : modelPositions) {
-    //   ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-    //     T = glm::translate(glm::mat4(1.0f), pos);
-    //     gbufferShader.setMat4("model", T*R*S);
-    //     return gbufferShader;
-    //   });
-    // }
-
     // load all value we need into shader
     auto setmodelShader = [&](dym::rdt::Shader &s, dym::rdt::Mesh &m) {
       s.use();
-      // TODO: calculate the model transformation matrix
-      // S*T*R? R*S*T? etc. Think about it and then fill in your answer.
       // rotate first, translate latter, scale whenever
       s.setMat4("model", glm::mat4(1.f)*T*R*S);
       s.setVec3("viewPos", camera.Position);
@@ -350,13 +287,10 @@ int main() {
       s.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
     };
 
-    for (auto &pos : modelPositions) {
-      T = glm::translate(glm::mat4(1.0f), pos);
-      ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-        setmodelShader(modelShader, m);
-        return modelShader;
-      });
-    }
+    ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
+      setmodelShader(modelShader, m);
+      return modelShader;
+    });
 
     // load light value and draw light object
     lightShader.use();
