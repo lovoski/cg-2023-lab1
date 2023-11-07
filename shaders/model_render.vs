@@ -20,11 +20,17 @@ uniform mat4 model;
 // uniform mat4 view;
 // uniform mat4 projection;
 
+uniform mat4 lightSpaceMatrix;
+out vec4 FragPosLightSpace;
+
 void main()
 {
   TexCoords=aTexCoords;
   // Normal=aNormal;
   FragPos=vec3(model*vec4(aPos,1.));
+
+  // the position for current frag in light view
+  FragPosLightSpace = lightSpaceMatrix*vec4(FragPos, 1.0);
 
   gl_Position=vec4(aPos,1.);
   gl_Position=projection*view*model*gl_Position;

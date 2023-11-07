@@ -6,6 +6,9 @@
 
 #include "config.h"
 
+const GLuint SHADOW_WIDTH = 1024;
+const GLuint SHADOW_HEIGHT = 1024;
+
 int main() {
   // init gui and imgui
   dym::GUI gui(SCR_WIDTH, SCR_HEIGHT, framebuffer_size_callback, mouse_callback,
@@ -34,6 +37,9 @@ int main() {
   // load sky box shader
   dym::rdt::Shader skyboxShader(SOURCE_DIR  "/shaders/skybox.vs", SOURCE_DIR  "/shaders/skybox.fs");
 
+  // shader for depth map
+  dym::rdt::Shader depthShader(SOURCE_DIR "/shaders/shadow/depthShader.vs", SOURCE_DIR "/shaders/shadow/depthShader.fs");
+
   // load models
   // -----------
   // // 1. backpack
@@ -42,7 +48,8 @@ int main() {
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) { return; };
   // glm::vec3 modelScaler(1.);
   // glm::vec3 initTranslater(0.);
-  // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // // glm::quat initRotate(1, glm::vec3(0, 0, 0));
+  // lvk::quaternion initRotate(1.0f, 0.0f, 0.0f, 0.0f);
 
   // // 2. nanosuit
   // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/nanosuit/nanosuit.obj");
@@ -77,6 +84,30 @@ int main() {
   //                        glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
   lvk::quaternion initRotate = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)))*
                          lvk::from_euler_angles(glm::radians(glm::vec3(-90.0f, 0.0f, 0.0f)));
+
+  // create framebuffer for depth mapping
+  GLuint depthMapFBO;
+  glGenFramebuffers(1, &depthMapFBO);
+
+  // create shadow map
+  GLuint depthMap;
+  glGenTextures(1, &depthMap);
+  glBindTexture(GL_TEXTURE_2D, depthMap);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
+               SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  // bind shadow map as depth map for depth buffer
+  glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+  // no need for color buffer
+  glDrawBuffer(GL_NONE);
+  glReadBuffer(GL_NONE);
+  // restore to default frame buffer
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   // moving light Cube
   // -----------------
@@ -139,6 +170,8 @@ int main() {
   double rotation_timer = 0;
 
   bool enableSkyLight = true;
+
+  GLfloat near_plane = 0.01f, far_plane = 100.0f;
 
   // render loop
   // -----------
@@ -243,10 +276,6 @@ int main() {
       ImGui::End();
     }
 
-    // render
-    // ------
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
     // use quat lightR to rotate lightbox
     if (currentFrame-rotation_timer >= rotation_interval) {
       lmat.position = lightR*lmat.position;
@@ -270,6 +299,29 @@ int main() {
     glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
 
+    // render
+    // render depth map first
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+    glm::mat4 lightView = glm::lookAt(lmat.position, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+    depthShader.use();
+    depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    depthShader.setMat4("model", T*R*S);
+    ourModel.Draw(depthShader);
+    T = glm::translate(glm::mat4(1.0f), initTranslater+glm::vec3(4.0f, 0.0f, 2.0f));
+    depthShader.setMat4("model", T*R*S);
+    ourModel.Draw(depthShader);
+    T = glm::translate(glm::mat4(1.0f), initTranslater);
+
+    // render the object with shadow map
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
     // load all value we need into shader
     auto setmodelShader = [&](dym::rdt::Shader &s, dym::rdt::Mesh &m) {
       s.use();
@@ -280,13 +332,20 @@ int main() {
       s.setLightMaterial("light", lmat);
       s.setTexture("skybox", skybox.texture);
       s.setFloat("skylightIntensity", skylightIntensity);
+      s.setTexture("depthMap", depthMap);
       bindOtherTexture(s);
+      s.setMat4("lightSpaceMatrix", lightSpaceMatrix);
       s.setFloat("gamma", gamma);
       s.setVec3("F0", F0);
 
       s.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
     };
 
+    ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
+      setmodelShader(modelShader, m);
+      return modelShader;
+    });
+    T = glm::translate(glm::mat4(1.0f), initTranslater+glm::vec3(4.0f, 0.0f, 2.0f));
     ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
       setmodelShader(modelShader, m);
       return modelShader;
