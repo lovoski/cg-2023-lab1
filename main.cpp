@@ -85,6 +85,9 @@ int main() {
   lvk::quaternion initRotate = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)))*
                          lvk::from_euler_angles(glm::radians(glm::vec3(-90.0f, 0.0f, 0.0f)));
 
+  lvk::quaternion midRotate1 = lvk::from_euler_angles(glm::radians(glm::vec3(20.0f, -120.0f, 90.0f)));
+  lvk::quaternion midRotate2 = lvk::from_euler_angles(glm::radians(glm::vec3(120.0f, -10.0f, 0.0f)));
+
   // create framebuffer for depth mapping
   GLuint depthMapFBO;
   glGenFramebuffers(1, &depthMapFBO);
@@ -173,6 +176,9 @@ int main() {
 
   GLfloat near_plane = 0.01f, far_plane = 100.0f;
 
+  float rotateState = 0.0f;
+  bool rotateModel = true;
+
   // render loop
   // -----------
   gui.update([&]() {
@@ -219,6 +225,7 @@ int main() {
       ImGui::SliderFloat("skylightIntensity", &(skylightIntensity), 0, 5,
                          "intensity = %.2f");
       ImGui::Checkbox("enable skylight", &enableSkyLight);
+      ImGui::Checkbox("enable model rotation", &rotateModel);
       ImGui::Text("Light Settings");
       ImGui::SliderFloat("light.ambient.r", &(lmat.ambient[0]), 0, 1,
                          "ambient.r = %.2f");
@@ -292,7 +299,20 @@ int main() {
     proj_ubuffer.setMat4(1, view);
     proj_ubuffer.close();
 
-    glm::mat4 R = glm::transpose(initRotate.to_mat4());
+    glm::mat4 R;
+    if (rotateModel) {
+      // rotation matrix : initRotate -> midRotate1 -> midRotate2 -> initRotate
+      if (rotateState <= 1.0f) {
+        R = glm::transpose(lvk::slerp(initRotate, midRotate1, rotateState).to_mat4());
+        rotateState += deltaTime;
+      } else if (rotateState <= 2.0f) {
+        R = glm::transpose(lvk::slerp(midRotate1, midRotate2, rotateState-1.0f).to_mat4());
+        rotateState += deltaTime;
+      } else if (rotateState <= 3.0f) {
+        R = glm::transpose(lvk::slerp(midRotate2, initRotate, rotateState-2.0f).to_mat4());
+        rotateState += deltaTime;
+      } else rotateState = 0.0f;
+    } else R = glm::transpose(initRotate.to_mat4());
     // translate: convert initTranslater to glm::mat4
     glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
     // scale: convert modelScaler to glm::mat4
