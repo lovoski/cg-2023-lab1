@@ -117,8 +117,10 @@ void main()
   float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * (dist * dist));
 
   vec3 reflectDir = reflect(-viewDir, norm);
+  vec3 F0_=mix(F0,objColor,objSpec);
+  vec3 F = fresnelSchlick(dot(norm, viewDir), F0_);
   vec3 sky;
-  sky = skylightIntensity*(texture(skybox, reflectDir).rgb);
+  sky = skylightIntensity*(objH.r+F*.3)*(texture(skybox, reflectDir).rgb);
 
   float shadow = ShadowCalculation(FragPosLightSpace);
 
