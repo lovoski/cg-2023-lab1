@@ -12,6 +12,7 @@ namespace lvk {
 class quaternion {
 public:
   float x, y, z, w, norm;
+  quaternion() {}
   quaternion(float _w, float _x, float _y, float _z) : x(_x), y(_y), z(_z), w(_w) {
     norm = sqrt(x*x+y*y+z*z+w*w);
   }
@@ -55,14 +56,24 @@ public:
     return *this;
   }
 
-  void normalize() {x/=norm;y/=norm;z/=norm;w/=norm;norm=1.0f;}
-  quaternion normalized() {return quaternion(w/norm, x/norm, y/norm, z/norm);}
+  void normalize() {
+    if (norm == 0) return;
+    x/=norm;y/=norm;z/=norm;w/=norm;norm=1.0f;
+  }
+  quaternion normalized() {
+    if (norm == 0) return quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+    return quaternion(w/norm, x/norm, y/norm, z/norm);
+  }
   quaternion conjugate() {return quaternion(w, -x, -y, -z);}
-  quaternion inverse() {return quaternion(w/norm, -x/norm, -y/norm, -z/norm);}
+  quaternion inverse() {
+    if (norm == 0) return quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+    return quaternion(w/norm, -x/norm, -y/norm, -z/norm);
+  }
 
   void display() {printf("w:%f,x:%f,y:%f,z:%f", w, x, y, z);}
 
-  glm::mat3 get_matrix() {
+  glm::mat3 get_mat3() {
+    if (norm = 0) return glm::mat3(1.0f);
     float a = w/norm;
     float b = x/norm;
     float c = y/norm;
@@ -74,6 +85,7 @@ public:
     );
   }
   glm::mat4 to_mat4() {
+    if (norm == 0) return glm::mat4(1.0f);
     float a = w/norm;
     float b = x/norm;
     float c = y/norm;
