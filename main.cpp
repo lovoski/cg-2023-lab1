@@ -6,6 +6,202 @@
 
 #include "config.h"
 
+glm::vec3 collider_bottom_P(0.0f, -20.0f, 0.0f);
+glm::vec3 collider_bottom_N(0.0f, 1.0f, 0.0f);
+
+glm::vec3 collider_A_P(-20.0f, 0.0f, 0.0f);
+glm::vec3 collider_A_N(1.0f, 0.0f, 0.0f);
+
+glm::vec3 collider_B_P(20.0f, 00.0f, 0.0f);
+glm::vec3 collider_B_N(-1.0f, 0.0f, 0.0f);
+
+glm::vec3 collider_C_P(0.0f, 0.0f, 20.0f);
+glm::vec3 collider_C_N(0.0f, 0.0f, -1.0f);
+
+glm::vec3 collider_D_P(0.0f, 0.0f, -20.0f);
+glm::vec3 collider_D_N(0.0f, 0.0f, 1.0f);
+
+inline float norm(glm::vec3 &vec) {
+  return std::sqrt(vec.x*vec.x+vec.y*vec.y+vec.z*vec.z);
+}
+
+class RigidBody {
+private:
+  dym::rdt::Model model;
+  glm::mat3 scale;
+  // reference inertia
+  glm::mat3 I_ref;
+  // the velocity
+  glm::vec3 v;
+  glm::vec3 w;
+  // for velocity decay
+  float linear_decay = 0.999f;
+  float angular_decay = 0.98f;
+  // for collision
+  float restitution = 0.5f;
+  // friction coefficient
+  float friction = 0.2f;
+
+  // gravity acceleration
+  glm::vec3 gravity;
+  float mass;
+  // position
+  glm::vec3 x;
+  // quaternion for rotation
+  lvk::quaternion q;
+
+  glm::mat3 cross_product_mat(glm::vec3 &v) {
+    return glm::mat3(0.0f, -v.z,  v.y,
+                      v.z, 0.0f, -v.x,
+                     -v.y,  v.x, 0.0f);
+  }
+
+  void model_vertice_iteration(std::function<void(dym::rdt::Vertex)> &&f) {
+    for (auto &&mesh : model.meshes) {
+      for (auto &&vert : mesh.vertices) {
+        f(vert);
+      }
+    }
+  }
+  void compute_inertia_mat() {
+    unsigned int V = 0;
+    for (auto &&mesh : model.meshes) {
+      V += mesh.vertices.size();
+    }
+    float m_i = mass/V;
+    I_ref = glm::mat3(0.0f);
+    model_vertice_iteration([&](dym::rdt::Vertex vert) {
+      glm::vec3 r_i = vert.Position;
+      float rr = r_i.x*r_i.x+r_i.y*r_i.y+r_i.z*r_i.z;
+      float x = r_i.x;
+      float y = r_i.y;
+      float z = r_i.z;
+      I_ref += m_i*glm::mat3(
+        rr-x*x,-x*y,-x*z,
+        -y*z,rr-y*y,-y*z,
+        -z*x,-z*y,rr-z*z
+      );
+    });
+  }
+  glm::mat3 inertia_inverse() {
+    glm::mat3 R = glm::mat3(q.to_mat4());
+    return glm::inverse(R*I_ref*glm::transpose(R));
+  }
+  // collision would cause the change of velocity
+  void impulse_collision(glm::vec3 P, glm::vec3 N) {
+    unsigned int collision_count = 0;
+    glm::vec3 collision_vertex(0.0f);
+    model_vertice_iteration([&](dym::rdt::Vertex vert) {
+      // check if one vertex is inside the collision plane
+      glm::vec3 r_i = scale*vert.Position; // position of local space
+      glm::vec3 Rr_i = q*r_i; // rotate first
+      glm::vec3 x_i = Rr_i+x; // then translate
+      if (glm::dot((x_i-P), N) < 0.0f) {
+        // if the object still moves into the plane
+        glm::vec3 v_i = v+glm::cross(w, Rr_i);
+        if (glm::dot(v_i, N) < 0.0f) {
+          collision_count++;
+          collision_vertex += r_i;
+        }
+      }
+    });
+    if (collision_count == 0) return;
+    // the average collision vertex
+    glm::vec3 r_collision = 1.0f/collision_count*collision_vertex;
+    // rotated collotion vertex
+    glm::vec3 Rr_collision = q*r_collision;
+    glm::vec3 v_collision = v+glm::cross(w, Rr_collision);
+
+    glm::vec3 v_N = glm::dot(v_collision, N)*N;
+    glm::vec3 v_T = v_collision-v_N;
+    glm::vec3 v_T_new = std::max(0.0f, 
+    1.0f-friction*(1.0f+restitution)*norm(v_N)/norm(v_T))*v_T;
+    glm::vec3 v_N_new = -restitution*v_N;
+    glm::vec3 v_new = v_T_new+v_N_new;
+    glm::mat3 Rr_i_star = cross_product_mat(Rr_collision);
+    glm::mat3 I_inverse = inertia_inverse();
+    glm::mat3 K = 1.0f/mass*glm::mat3(1.0f)-Rr_i_star*I_inverse*Rr_i_star;
+    glm::vec3 j = glm::inverse(K)*(v_new-v_collision);
+
+    v += 1.0f/mass*j;
+    w += I_inverse*glm::cross(Rr_collision, j);
+  }
+public:
+  RigidBody(
+    dym::rdt::Model &_model,
+    glm::vec3 _gravity,
+    float _mass,
+    lvk::quaternion _initR,
+    glm::vec3 _initT,
+    glm::vec3 _initS
+  ) {
+    v = glm::vec3(0.0f);
+    w = glm::vec3(0.0f);
+    setModel(_model);
+    setGravity(_gravity);
+    setMass(-mass);
+    setInitRotation(_initR);
+    setInitTranslation(_initT);
+    glm::mat3 S = glm::mat3(glm::scale(glm::mat4(1.0f), _initS));
+    setScale(S);
+  }
+  ~RigidBody() {}
+  // called in each rendering loop
+  // update the matrix for translation and rotation
+  void update(float dt) {
+    v += dt*gravity;
+    v *= linear_decay;
+    w *= angular_decay;
+    // perform collision test
+    impulse_collision(collider_bottom_P, collider_bottom_N);
+    // impulse_collision(collider_A_P, collider_A_N);
+    impulse_collision(collider_B_P, collider_B_N);
+    // impulse_collision(collider_C_P, collider_C_N);
+    // impulse_collision(collider_D_P, collider_D_N);
+
+    // update position and quaternion rotation
+    x += dt*v;
+    glm::vec3 dw = 0.5f*dt*w;
+    lvk::quaternion qw(0.0f, dw.x, dw.y, dw.z);
+    q = q + qw*q;
+  }
+  glm::mat4 getR() {
+    return q.to_mat4();
+  }
+  glm::mat4 getT() {
+    return glm::translate(glm::mat4(1.0f), x);
+  }
+  glm::vec3 getX() {return x;}
+  void setModel(dym::rdt::Model &m) {
+    model = m;
+    // compute I_ref
+    compute_inertia_mat();
+  }
+  void setGravity(glm::vec3 &g) {gravity = g;}
+  void setMass(float m) {mass = m;}
+  void setInitRotation(lvk::quaternion &quat) {q = quat;}
+  void setInitTranslation(glm::vec3 &trans) {x = trans;}
+  void setScale(glm::mat3 &scale) {this->scale = scale;}
+
+  void addVelocity(glm::vec3 &velocity) {
+    v += velocity;
+  }
+  void addRotation(glm::vec3 &wVelocity) {
+    w += wVelocity;
+  }
+  void adjustParameters(
+    float restitution = 0.5f,
+    float friction = 0.2f,
+    float linear_decay = 0.999f,
+    float angular_decay = 0.98f
+  ) {
+    this->restitution = restitution;
+    this->friction = friction;
+    this->linear_decay = linear_decay;
+    this->angular_decay = angular_decay;
+  }
+};
+
 const GLuint SHADOW_WIDTH = 1024;
 const GLuint SHADOW_HEIGHT = 1024;
 
@@ -79,7 +275,7 @@ int main() {
   };
   setReflect = true;
   glm::vec3 modelScaler(0.05f);
-  glm::vec3 initTranslater(0);
+  glm::vec3 initTranslater(0.0f, 20.0f, 0.0f);
   // glm::quat initRotate = glm::quat(glm::radians(glm::vec3(0, 90, 0))) *
   //                        glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
   lvk::quaternion initRotate = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)))*
@@ -177,8 +373,16 @@ int main() {
   GLfloat near_plane = 0.01f, far_plane = 100.0f;
 
   float rotateState = 0.0f;
-  bool rotateModel = true;
+  bool rotateModel = false;
 
+  RigidBody rb(ourModel, glm::vec3(0.0f, -9.8f, 0.0f), 10.0f, initRotate, initTranslater, modelScaler);
+
+  glm::vec3 translator = initTranslater;
+
+  float restitution = 0.5f;
+  float friction = 0.2f;
+  float linear_decay = 0.999f;
+  float angular_decay = 0.98f;
   // render loop
   // -----------
   gui.update([&]() {
@@ -188,9 +392,25 @@ int main() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    rb.adjustParameters(restitution, friction, linear_decay, angular_decay);
+
+    while (deltaTime > 0.0f) {
+      rb.update(0.1f);
+      deltaTime -= 0.1f;
+    }
+
     // accept and process all keyboard and mouse input
     // ----------------------------
     processInput(gui.window);
+
+    glm::vec3 deltaVelocity(1.0f, 0.0f, 0.0f);
+    glm::vec3 deltaRotation(2.0f, 0.0f, 0.0f);
+    if (glfwGetKey(gui.window, GLFW_KEY_Q) == GLFW_PRESS) {
+      rb.addVelocity(deltaVelocity);
+    }
+    if (glfwGetKey(gui.window, GLFW_KEY_R) == GLFW_PRESS) {
+      rb.addRotation(deltaRotation);
+    }
 
     // mygui update
     myimgui.Update();
@@ -281,6 +501,13 @@ int main() {
       ImGui::SliderFloat("fovy", &(camera.Zoom), 1.0f, 110.f,
                          "fovy = %.1f");
       ImGui::End();
+
+      ImGui::Begin("Physics Parameters");
+      ImGui::SliderFloat("restitution", &restitution, 0.0f, 1.0f, "restitution = %.1f");
+      ImGui::SliderFloat("friction", &friction, 0.0f, 1.0f, "friction = %.1f");
+      ImGui::SliderFloat("linear_decay", &linear_decay, 0.0f, 2.0f, "linear_decay = %.3f");
+      ImGui::SliderFloat("angular_decay", &angular_decay, 0.0f, 2.0f, "angular_decay = %.3f");
+      ImGui::End();
     }
 
     // use quat lightR to rotate lightbox
@@ -312,9 +539,13 @@ int main() {
         R = glm::transpose(lvk::slerp(midRotate2, initRotate, rotateState-2.0f).to_mat4());
         rotateState += deltaTime;
       } else rotateState = 0.0f;
-    } else R = glm::transpose(initRotate.to_mat4());
+    } else {
+      // R = glm::transpose(initRotate.to_mat4());
+      R = glm::transpose(rb.getR());
+    }
     // translate: convert initTranslater to glm::mat4
-    glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
+    // glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
+    glm::mat4 T = rb.getT();
     // scale: convert modelScaler to glm::mat4
     glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
@@ -332,42 +563,47 @@ int main() {
     depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
     depthShader.setMat4("model", T*R*S);
     ourModel.Draw(depthShader);
-    T = glm::translate(glm::mat4(1.0f), initTranslater+glm::vec3(4.0f, 0.0f, 2.0f));
-    depthShader.setMat4("model", T*R*S);
+    depthShader.setMat4("model", glm::translate(glm::mat4(1.0f), rb.getX()+glm::vec3(4.0f, 0.0f, 2.0f))*R*S);
     ourModel.Draw(depthShader);
-    T = glm::translate(glm::mat4(1.0f), initTranslater);
 
     // render the object with shadow map
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-    // load all value we need into shader
-    auto setmodelShader = [&](dym::rdt::Shader &s, dym::rdt::Mesh &m) {
-      s.use();
-      // rotate first, translate latter, scale whenever
-      s.setMat4("model", glm::mat4(1.f)*T*R*S);
-      s.setVec3("viewPos", camera.Position);
-      s.setMaterial("material", mat);
-      s.setLightMaterial("light", lmat);
-      s.setTexture("skybox", skybox.texture);
-      s.setFloat("skylightIntensity", skylightIntensity);
-      s.setTexture("depthMap", depthMap);
-      bindOtherTexture(s);
-      s.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-      s.setFloat("gamma", gamma);
-      s.setVec3("F0", F0);
-
-      s.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
-    };
-
     ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-      setmodelShader(modelShader, m);
+      modelShader.use();
+      modelShader.setMat4("model", glm::mat4(1.f)*T*R*S);
+      modelShader.setVec3("viewPos", camera.Position);
+      modelShader.setMaterial("material", mat);
+      modelShader.setLightMaterial("light", lmat);
+      modelShader.setTexture("skybox", skybox.texture);
+      modelShader.setFloat("skylightIntensity", skylightIntensity);
+      modelShader.setTexture("depthMap", depthMap);
+      bindOtherTexture(modelShader);
+      modelShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+      modelShader.setFloat("gamma", gamma);
+      modelShader.setVec3("F0", F0);
+
+      modelShader.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
       return modelShader;
     });
     T = glm::translate(glm::mat4(1.0f), initTranslater+glm::vec3(4.0f, 0.0f, 2.0f));
     ourModel.Draw([&](dym::rdt::Mesh &m) -> dym::rdt::Shader & {
-      setmodelShader(modelShader, m);
+      modelShader.use();
+      modelShader.setMat4("model", glm::mat4(1.f)*glm::translate(glm::mat4(1.0f), rb.getX()+glm::vec3(4.0f, 0.0f, 2.0f))*R*S);
+      modelShader.setVec3("viewPos", camera.Position);
+      modelShader.setMaterial("material", mat);
+      modelShader.setLightMaterial("light", lmat);
+      modelShader.setTexture("skybox", skybox.texture);
+      modelShader.setFloat("skylightIntensity", skylightIntensity);
+      modelShader.setTexture("depthMap", depthMap);
+      bindOtherTexture(modelShader);
+      modelShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+      modelShader.setFloat("gamma", gamma);
+      modelShader.setVec3("F0", F0);
+
+      modelShader.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
       return modelShader;
     });
 
@@ -377,6 +613,12 @@ int main() {
     lightShader.setVec3("lightPos", lmat.position);
     lightShader.setVec3("lightColor", lmat.ambient);
     // draw
+    lightCube.Draw(lightShader);
+    lightShader.setVec3("lightPos", glm::vec3(0, -20, 0));
+    lightShader.setVec3("lightColor", glm::vec3(1.0f, 0.0f, 0.0f));
+    lightCube.Draw(lightShader);
+    lightShader.setVec3("lightPos", glm::vec3(0, -40, 0));
+    lightShader.setVec3("lightColor", glm::vec3(0.0f, 1.0f, 0.0f));
     lightCube.Draw(lightShader);
 
     // load skybox value and draw skybox

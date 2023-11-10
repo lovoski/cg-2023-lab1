@@ -183,6 +183,9 @@ public:
   std::string directory;
   bool gammaCorrection;
 
+  // default constructor
+  Model() {}
+
   // constructor, expects a filepath to a 3D model.
   Model(std::string const &path, bool gamma = false, bool flipTexture = false)
       : gammaCorrection(gamma) {
