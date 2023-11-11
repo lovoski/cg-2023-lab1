@@ -6,6 +6,47 @@
 
 #include "config.h"
 
+void draw_plane(std::vector<glm::vec3> &v, glm::vec3 N, dym::rdt::Shader &shader) {
+  GLfloat *vertices = new GLfloat[v.size()*6];
+
+  // fill in vertices
+  for (unsigned int i = 0; i < v.size(); ++i) {
+    vertices[i*6] = v[i].x;
+    vertices[i*6+1] = v[i].y;
+    vertices[i*6+2] = v[i].z;
+    vertices[i*6+3] = N.x;
+    vertices[i*6+4] = N.y;
+    vertices[i*6+5] = N.z;
+  }
+
+  unsigned int VAO, VBO;
+
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+  glBindVertexArray(VAO);
+
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float)*6*v.size(), vertices, GL_STATIC_DRAW);
+
+  // position attribute
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+  // normal attribute
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
+  shader.use();
+
+  glBindVertexArray(VAO);
+  glDrawArrays(GL_TRIANGLE_FAN, 0, v.size());
+
+  glDeleteVertexArrays(1, &VAO);
+  glDeleteBuffers(1, &VBO);
+
+  delete vertices;
+}
+
 glm::vec3 collider_bottom_P(0.0f, -20.0f, 0.0f);
 glm::vec3 collider_bottom_N(0.0f, 1.0f, 0.0f);
 
@@ -236,6 +277,9 @@ int main() {
   // shader for depth map
   dym::rdt::Shader depthShader(SOURCE_DIR "/shaders/shadow/depthShader.vs", SOURCE_DIR "/shaders/shadow/depthShader.fs");
 
+  // shader for plane rendering
+  dym::rdt::Shader planeShader(SOURCE_DIR "/shaders/plane.vs", SOURCE_DIR "/shaders/plane.fs");
+
   // load models
   // -----------
   // // 1. backpack
@@ -386,6 +430,22 @@ int main() {
   float friction = 0.2f;
   float linear_decay = 0.999f;
   float angular_decay = 0.98f;
+
+  std::vector<glm::vec3> plane_vertex_a {
+    glm::vec3(-20.0f, -20.0f, -20.0f),
+    glm::vec3(20.0f, -20.0f, -20.0f),
+    glm::vec3(20.0f, -20.0f, 20.0f),
+    glm::vec3(-20.0f, -20.0f, 20.0f),
+  };
+  glm::vec3 plane_normal_a(0.0f, 1.0f, 0.0f);
+
+  std::vector<glm::vec3> plane_vertex_b {
+    glm::vec3(20.0f, -20.0f, -20.0f),
+    glm::vec3(20.0f, 20.0f, -20.0f),
+    glm::vec3(20.0f, 20.0f, 20.0f),
+    glm::vec3(20.0f, -20.0f, 20.0f),
+  };
+  glm::vec3 plane_normal_b(-1.0f, 0.0f, 0.0f);
 
   float dt = 0.008f;
   // render loop
@@ -562,14 +622,16 @@ int main() {
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     glClear(GL_DEPTH_BUFFER_BIT);
-    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-    glm::mat4 lightView = glm::lookAt(lmat.position, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 lightProjection = glm::ortho(-15.0f, 15.0f, -15.0f, 15.0f, near_plane, far_plane);
+    glm::mat4 lightView = glm::lookAt(lmat.position, rb.getX(), glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), rb.getX()-lmat.position)));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     depthShader.use();
     depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
     depthShader.setMat4("model", T*R*S);
     ourModel.Draw(depthShader);
+    // draw_plane(plane_vertex_a, plane_normal_a, depthShader);
+    // draw_plane(plane_vertex_b, plane_normal_b, depthShader);
 
     // render the object with shadow map
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -593,6 +655,17 @@ int main() {
       modelShader.setBool("existHeigTex", m.textures.size() == 4 || setReflect);
       return modelShader;
     });
+
+    planeShader.use();
+    planeShader.setMat4("view", view);
+    planeShader.setMat4("projection", projection);
+    planeShader.setLightMaterial("light", lmat);
+    planeShader.setTexture("depthMap", depthMap);
+    planeShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    planeShader.setVec3("PassInColor", glm::vec3(0.5f, 0.5f, 0.5f));
+    draw_plane(plane_vertex_a, plane_normal_a, planeShader);
+    planeShader.setVec3("PassInColor", glm::vec3(0.6f, 0.6f, 0.6f));
+    draw_plane(plane_vertex_b, plane_normal_b, planeShader);
 
     // load light value and draw light object
     lightShader.use();
