@@ -48,7 +48,7 @@ private:
   // position
   glm::vec3 x;
   // quaternion for rotation
-  lvk::quaternion q;
+  glm::quat q;
 
   glm::mat3 cross_product_mat(glm::vec3 &v) {
     return glm::mat3(0.0f, -v.z,  v.y,
@@ -84,7 +84,7 @@ private:
     });
   }
   glm::mat3 inertia_inverse() {
-    glm::mat3 R = glm::mat3(q.to_mat4());
+    glm::mat3 R = glm::mat3_cast(q);
     return glm::inverse(R*I_ref*glm::transpose(R));
   }
   // collision would cause the change of velocity
@@ -131,7 +131,7 @@ public:
     dym::rdt::Model &_model,
     glm::vec3 _gravity,
     float _mass,
-    lvk::quaternion _initR,
+    glm::quat _initR,
     glm::vec3 _initT,
     glm::vec3 _initS
   ) {
@@ -162,11 +162,11 @@ public:
     // update position and quaternion rotation
     x += dt*v;
     glm::vec3 dw = 0.5f*dt*w;
-    lvk::quaternion qw(0.0f, dw.x, dw.y, dw.z);
+    glm::quat qw(0.0f, dw.x, dw.y, dw.z);
     q = q + qw*q;
   }
   glm::mat4 getR() {
-    return q.to_mat4();
+    return glm::mat4_cast(q);
   }
   glm::mat4 getT() {
     return glm::translate(glm::mat4(1.0f), x);
@@ -179,7 +179,7 @@ public:
   }
   void setGravity(glm::vec3 &g) {gravity = g;}
   void setMass(float m) {mass = m;}
-  void setInitRotation(lvk::quaternion &quat) {q = quat;}
+  void setInitRotation(glm::quat &quat) {q = quat;}
   void setInitTranslation(glm::vec3 &trans) {x = trans;}
   void setScale(glm::mat3 &scale) {this->scale = scale;}
 
@@ -275,7 +275,7 @@ int main() {
   };
   setReflect = true;
   glm::vec3 modelScaler(0.05f);
-  glm::vec3 initTranslater(0.0f, 20.0f, 0.0f);
+  glm::vec3 initTranslater(0.0f, 0.0f, 0.0f);
   // glm::quat initRotate = glm::quat(glm::radians(glm::vec3(0, 90, 0))) *
   //                        glm::quat(glm::radians(glm::vec3(-90, 0, 0)));
   lvk::quaternion initRotate = lvk::from_euler_angles(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)))*
@@ -283,6 +283,9 @@ int main() {
 
   lvk::quaternion midRotate1 = lvk::from_euler_angles(glm::radians(glm::vec3(20.0f, -120.0f, 90.0f)));
   lvk::quaternion midRotate2 = lvk::from_euler_angles(glm::radians(glm::vec3(120.0f, -10.0f, 0.0f)));
+
+  // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/cube.obj");
+  // auto bindOtherTexture = [&](dym::rdt::Shader &s) {};
 
   // create framebuffer for depth mapping
   GLuint depthMapFBO;
@@ -375,7 +378,7 @@ int main() {
   float rotateState = 0.0f;
   bool rotateModel = false;
 
-  RigidBody rb(ourModel, glm::vec3(0.0f, -9.8f, 0.0f), 10.0f, initRotate, initTranslater, modelScaler);
+  RigidBody rb(ourModel, glm::vec3(0.0f, -9.8f, 0.0f), 10.0f, glm::quat(initRotate.w, initRotate.x, initRotate.y, initRotate.z), initTranslater, modelScaler);
 
   glm::vec3 translator = initTranslater;
 
@@ -394,10 +397,11 @@ int main() {
 
     rb.adjustParameters(restitution, friction, linear_decay, angular_decay);
 
-    while (deltaTime > 0.0f) {
-      rb.update(0.1f);
-      deltaTime -= 0.1f;
-    }
+    // while (deltaTime > 0.0f) {
+    //   rb.update(0.1f);
+    //   deltaTime -= 0.1f;
+    // }
+    rb.update(0.008f);
 
     // accept and process all keyboard and mouse input
     // ----------------------------
@@ -541,7 +545,7 @@ int main() {
       } else rotateState = 0.0f;
     } else {
       // R = glm::transpose(initRotate.to_mat4());
-      R = glm::transpose(rb.getR());
+      R = rb.getR();
     }
     // translate: convert initTranslater to glm::mat4
     // glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
