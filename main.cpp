@@ -223,6 +223,9 @@ public:
   void set_init_translation(glm::vec3 &trans) {x = trans;}
   void set_scale(glm::mat3 &scale) {this->scale = scale;}
 
+  void set_position(glm::vec3 &pos) {this->x = pos;}
+  void clear_velocity() {v = glm::vec3(0.0f);w = glm::vec3(0.0f);}
+
   void add_velocity(glm::vec3 &velocity) {
     v += velocity;
   }
@@ -325,7 +328,7 @@ int main() {
                          lvk::from_euler_angles(glm::radians(glm::vec3(-90.0f, 0.0f, 0.0f)));
 
   lvk::quaternion midRotate1 = lvk::from_euler_angles(glm::radians(glm::vec3(20.0f, -120.0f, 90.0f)));
-  lvk::quaternion midRotate2 = lvk::from_euler_angles(glm::radians(glm::vec3(120.0f, -10.0f, 0.0f)));
+  lvk::quaternion midRotate2 = lvk::from_euler_angles(glm::radians(glm::vec3(120.0f, 110.0f, 0.0f)));
 
   // dym::rdt::Model ourModel(SOURCE_DIR "/resources/objects/cube.obj");
   // auto bindOtherTexture = [&](dym::rdt::Shader &s) {};
@@ -421,7 +424,12 @@ int main() {
   float rotateState = 0.0f;
   bool rotateModel = false;
 
-  RigidBody rb(ourModel, glm::vec3(0.0f, -9.8f, 0.0f), 10.0f, initRotate, initTranslater, modelScaler);
+  glm::vec3 gravity(0.0f, -9.8f, 0.0f);
+  glm::vec3 zeros(0.0f, 0.0f, 0.0f);
+  bool enable_gravity = true;
+  float mass = 10.0f;
+
+  RigidBody rb(ourModel, gravity, mass, initRotate, initTranslater, modelScaler);
 
   glm::vec3 translator = initTranslater;
 
@@ -446,6 +454,8 @@ int main() {
   };
   glm::vec3 plane_normal_b(-1.0f, 0.0f, 0.0f);
 
+  bool enable_planes = true;
+
   float dt = 0.008f;
   // render loop
   // -----------
@@ -457,6 +467,11 @@ int main() {
     lastFrame = currentFrame;
 
     rb.adjust_parameters(restitution, friction, linear_decay, angular_decay);
+    if (enable_gravity) {
+      rb.set_gravity(gravity);
+    } else {
+      rb.set_gravity(zeros);
+    }
 
     // while (deltaTime > 0.0f) {
     //   rb.update(0.1f);
@@ -573,6 +588,17 @@ int main() {
       ImGui::SliderFloat("linear_decay", &linear_decay, 0.0f, 2.0f, "linear_decay = %.3f");
       ImGui::SliderFloat("angular_decay", &angular_decay, 0.0f, 2.0f, "angular_decay = %.3f");
       ImGui::SliderFloat("dt", &dt, 0.0f, 0.5f, "dt = %.4f");
+      ImGui::SliderFloat("gravity.x", &gravity.x, -10.0f, 10.0f, "gravity.x = %.f");
+      ImGui::SliderFloat("gravity.y", &gravity.y, -10.0f, 10.0f, "gravity.y = %.f");
+      ImGui::SliderFloat("gravity.z", &gravity.z, -10.0f, 10.0f, "gravity.z = %.f");
+      ImGui::Checkbox("enable gravity", &enable_gravity);
+      ImGui::Checkbox("enable shadow planes", &enable_planes);
+      if (ImGui::Button("reset position", ImVec2(200, 30))) {
+        rb.set_position(initTranslater);
+      }
+      if (ImGui::Button("clear velocity", ImVec2(200, 30))) {
+        rb.clear_velocity();
+      }
       ImGui::End();
     }
 
@@ -655,16 +681,18 @@ int main() {
       return modelShader;
     });
 
-    planeShader.use();
-    planeShader.setMat4("view", view);
-    planeShader.setMat4("projection", projection);
-    planeShader.setLightMaterial("light", lmat);
-    planeShader.setTexture("depthMap", depthMap);
-    planeShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-    planeShader.setVec3("PassInColor", glm::vec3(0.5f, 0.5f, 0.5f));
-    draw_plane(plane_vertex_a, plane_normal_a, planeShader);
-    planeShader.setVec3("PassInColor", glm::vec3(0.6f, 0.6f, 0.6f));
-    draw_plane(plane_vertex_b, plane_normal_b, planeShader);
+    if (enable_planes) {
+      planeShader.use();
+      planeShader.setMat4("view", view);
+      planeShader.setMat4("projection", projection);
+      planeShader.setLightMaterial("light", lmat);
+      planeShader.setTexture("depthMap", depthMap);
+      planeShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+      planeShader.setVec3("PassInColor", glm::vec3(0.5f, 0.5f, 0.5f));
+      draw_plane(plane_vertex_a, plane_normal_a, planeShader);
+      planeShader.setVec3("PassInColor", glm::vec3(0.6f, 0.6f, 0.6f));
+      draw_plane(plane_vertex_b, plane_normal_b, planeShader);
+    }
 
     // load light value and draw light object
     lightShader.use();
