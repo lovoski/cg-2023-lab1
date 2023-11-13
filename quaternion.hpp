@@ -72,8 +72,8 @@ public:
 
   void display() {printf("w:%f,x:%f,y:%f,z:%f", w, x, y, z);}
 
-  glm::mat3 get_mat3() {
-    if (norm = 0) return glm::mat3(1.0f);
+  glm::mat3 to_mat3() {
+    if (norm == 0) return glm::mat3(1.0f);
     float a = w/norm;
     float b = x/norm;
     float c = y/norm;

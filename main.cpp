@@ -125,7 +125,7 @@ private:
     });
   }
   glm::mat3 inertia_inverse() {
-    glm::mat3 R = glm::mat3(q.to_mat4());
+    glm::mat3 R = q.to_mat3();
     return glm::inverse(R*I_ref*glm::transpose(R));
   }
   // collision would cause the change of velocity
@@ -178,13 +178,14 @@ public:
   ) {
     v = glm::vec3(0.0f);
     w = glm::vec3(0.0f);
-    setModel(_model);
-    setGravity(_gravity);
-    setMass(-mass);
-    setInitRotation(_initR);
-    setInitTranslation(_initT);
+    set_model(_model);
+    set_gravity(_gravity);
+    set_mass(_mass);
+    set_init_rotation(_initR);
+    set_init_translation(_initT);
     glm::mat3 S = glm::mat3(glm::scale(glm::mat4(1.0f), _initS));
-    setScale(S);
+    set_scale(S);
+    compute_inertia_mat();
   }
   ~RigidBody() {}
   // called in each rendering loop
@@ -206,31 +207,29 @@ public:
     lvk::quaternion qw(0.0f, dw.x, dw.y, dw.z);
     q = q + qw*q;
   }
-  glm::mat4 getR() {
+  glm::mat4 get_R() {
     return glm::transpose(q.to_mat4());
   }
-  glm::mat4 getT() {
+  glm::mat4 get_T() {
     return glm::translate(glm::mat4(1.0f), x);
   }
-  glm::vec3 getX() {return x;}
-  void setModel(dym::rdt::Model &m) {
+  glm::vec3 get_X() {return x;}
+  void set_model(dym::rdt::Model &m) {
     model = m;
-    // compute I_ref
-    compute_inertia_mat();
   }
-  void setGravity(glm::vec3 &g) {gravity = g;}
-  void setMass(float m) {mass = m;}
-  void setInitRotation(lvk::quaternion &quat) {q = quat;}
-  void setInitTranslation(glm::vec3 &trans) {x = trans;}
-  void setScale(glm::mat3 &scale) {this->scale = scale;}
+  void set_gravity(glm::vec3 &g) {gravity = g;}
+  void set_mass(float m) {mass = m;}
+  void set_init_rotation(lvk::quaternion &quat) {q = quat;}
+  void set_init_translation(glm::vec3 &trans) {x = trans;}
+  void set_scale(glm::mat3 &scale) {this->scale = scale;}
 
-  void addVelocity(glm::vec3 &velocity) {
+  void add_velocity(glm::vec3 &velocity) {
     v += velocity;
   }
-  void addRotation(glm::vec3 &wVelocity) {
+  void add_rotation(glm::vec3 &wVelocity) {
     w += wVelocity;
   }
-  void adjustParameters(
+  void adjust_parameters(
     float restitution = 0.5f,
     float friction = 0.2f,
     float linear_decay = 0.999f,
@@ -457,7 +456,7 @@ int main() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
-    rb.adjustParameters(restitution, friction, linear_decay, angular_decay);
+    rb.adjust_parameters(restitution, friction, linear_decay, angular_decay);
 
     // while (deltaTime > 0.0f) {
     //   rb.update(0.1f);
@@ -472,10 +471,10 @@ int main() {
     glm::vec3 deltaVelocity(1.0f, 0.0f, 0.0f);
     glm::vec3 deltaRotation(2.0f, 0.0f, 0.0f);
     if (glfwGetKey(gui.window, GLFW_KEY_Q) == GLFW_PRESS) {
-      rb.addVelocity(deltaVelocity);
+      rb.add_velocity(deltaVelocity);
     }
     if (glfwGetKey(gui.window, GLFW_KEY_R) == GLFW_PRESS) {
-      rb.addRotation(deltaRotation);
+      rb.add_rotation(deltaRotation);
     }
 
     // mygui update
@@ -608,11 +607,11 @@ int main() {
       } else rotateState = 0.0f;
     } else {
       // R = glm::transpose(initRotate.to_mat4());
-      R = rb.getR();
+      R = rb.get_R();
     }
     // translate: convert initTranslater to glm::mat4
     // glm::mat4 T = glm::translate(glm::mat4(1.0f), initTranslater);
-    glm::mat4 T = rb.getT();
+    glm::mat4 T = rb.get_T();
     // scale: convert modelScaler to glm::mat4
     glm::mat4 S = glm::scale(glm::mat4(1.0f), modelScaler);
     // we don's need any shear in our experiment
@@ -623,7 +622,7 @@ int main() {
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     glClear(GL_DEPTH_BUFFER_BIT);
     glm::mat4 lightProjection = glm::ortho(-15.0f, 15.0f, -15.0f, 15.0f, near_plane, far_plane);
-    glm::mat4 lightView = glm::lookAt(lmat.position, rb.getX(), glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), rb.getX()-lmat.position)));
+    glm::mat4 lightView = glm::lookAt(lmat.position, rb.get_X(), glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), rb.get_X()-lmat.position)));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     depthShader.use();
