@@ -167,6 +167,15 @@ private:
     v += 1.0f/mass*j;
     w += I_inverse*glm::cross(Rr_collision, j);
   }
+  glm::vec3 get_torque() {
+    glm::vec3 torque(0.0f);
+    model_vertice_iteration([&](dym::rdt::Vertex vert) {
+      glm::vec3 r_i = scale*vert.Position; // position of local space
+      glm::vec3 Rr_i = q*r_i; // rotate first
+      torque += glm::cross(Rr_i, gravity);
+    });
+    return torque;
+  }
 public:
   RigidBody(
     dym::rdt::Model &_model,
@@ -203,7 +212,8 @@ public:
 
     // update position and quaternion rotation
     x += dt*v;
-    glm::vec3 dw = 0.5f*dt*w;
+    glm::vec3 dw = (w+dt*inertia_inverse()*get_torque())*0.5f*dt;
+    // glm::vec3 dw = 0.5f*dt*w;
     lvk::quaternion qw(0.0f, dw.x, dw.y, dw.z);
     q = q + qw*q;
   }
